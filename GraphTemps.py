@@ -25,17 +25,24 @@ twoWeeksAgo = (datetime.today() - timedelta(days=14))
 filePath = os.path.abspath(os.path.join(os.environ['HOME'], 'GraphingData'))
 ServerTimeFromUTC = timedelta(hours=0)
 ServerTimeFromUTCSec = 0
-haschema = "homeassistant"
-myschema = "demay_farm"
+haschema = ""
+myschema = ""
+BeginTime = None       # Number of days to plot
 
     # make sure "fdata" is defined AS a dataframe; value ignored if csv data is read.
 #fdata = pd.DataFrame({ 'A' : 1., 'B' : pd.Timestamp('20130102'), 'C' : pd.Series(1,index=list(range(4)),dtype='float32') })
 
-def makeQuery(dataName, tableName, timeField='time', databaseName='demay_farm'):
-    return "SELECT {timeField} AS 'Time', value AS '{dataName}' \
+def makeQuery(dataName, tableName, timeField='time', databaseName=None):
+    global myschema
+    callStack.append('makeQuery')
+    if databaseName is None: databaseName = myschema
+    query = "SELECT {timeField} AS 'Time', value AS '{dataName}' \
     FROM `{databaseName}`.`{tableName}` \
     WHERE {timeField} > '%s' \
     ORDER BY {timeField}".format(timeField=timeField, dataName=dataName, tableName=tableName, databaseName=databaseName)
+    if Verbosity >= 2: print(callStack, "generated query is: ", query)
+    callStack.pop()
+    return query
 
 def GetData(DBConn, fileName, query, beginDate, dataTimeOffsetUTC=timedelta(0)):
     """
@@ -96,16 +103,22 @@ def GetData(DBConn, fileName, query, beginDate, dataTimeOffsetUTC=timedelta(0)):
             os.remove(theFile)
             if Verbosity >= 1: print(callStack, 'CSV file deleted.')
         else:
-            fdata = pd.read_csv(theFile, index_col=0, parse_dates=True).query(slicer)
-            if fdata.size > 0: beginDate = fdata.index[-1]
+            fdata = pd.read_csv(theFile, index_col=0, parse_dates=True)
             if Verbosity >= 2: print(callStack, 'Num Points from CSV = ', fdata.size)
-            if Verbosity >= 2: print(callStack, 'Last CSV time = new beginDate = ', beginDate)
-            if Verbosity >= 3: print(callStack, 'CSVdata tail:\n', fdata.tail())
-            if Verbosity >= 4: print(callStack, 'CSVdata dtypes:\n', fdata.dtypes)
-            if Verbosity >= 4: print(callStack, 'CSVdata columns:\n', fdata.columns)
-            if Verbosity >= 4: print(callStack, 'CSVdata index:\n', fdata.index)
-            CSVdataRead = True
-            pass
+            if (fdata.size > 0) and (fdata.index[0] <= beginDate):
+                beginDate = fdata.index[-1]
+                if Verbosity >= 2: print(callStack, 'Last CSV time = new beginDate = ', beginDate)
+                if Verbosity >= 3: print(callStack, 'CSVdata tail:\n', fdata.tail())
+                if Verbosity >= 4: print(callStack, 'CSVdata dtypes:\n', fdata.dtypes)
+                if Verbosity >= 4: print(callStack, 'CSVdata columns:\n', fdata.columns)
+                if Verbosity >= 4: print(callStack, 'CSVdata index:\n', fdata.index)
+                CSVdataRead = True
+            elif (Verbosity >= 1) and (fdata.size <= 0):
+                print(callStack, "CSV file exists but has no data.") 
+            elif (Verbosity >= 1) and (fdata.size > 0) and (fdata.index[0] > beginDate):
+                print(callStack, "CSV data all more recent than desired data; ignore it.")
+            else:
+                pass
     else:
         if Verbosity >= 2: print(callStack, 'CSV file does not exist.')
         pass
@@ -153,7 +166,8 @@ def GetData(DBConn, fileName, query, beginDate, dataTimeOffsetUTC=timedelta(0)):
         data = fdata
         pass
 
-    data.to_csv(theFile, index='Time')
+    # Only save two weeks of data in the CSV file
+    data.query('index > "%s"'%(twoWeeksAgo + dataTimeOffsetUTC).isoformat()).to_csv(theFile, index='Time')
     callStack.pop()
     # in "context" of calling function
     tag = os.path.splitext(fileName)[0]
@@ -163,19 +177,21 @@ def GetData(DBConn, fileName, query, beginDate, dataTimeOffsetUTC=timedelta(0)):
     if Verbosity >= 4: print(callStack, tag, 'columns:\n', data.columns)
     if Verbosity >= 4: print(callStack, tag, 'index:\n', data.index)
 
-    return data
+    return data.query(slicer)       # return data from beginDate to  present
 
-def ShowRCPower(DBConn, beginDate=None):
+def ShowRCPower(DBConn):
     global Verbosity, callStack, filePath, ServerTimeFromUTC
     callStack.append('ShowRCPower')
     ###############################  POWER  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    if beginDate == None: beginDate = twoWeeksAgo
+    beginDate = BeginTime
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
     ax1.set_xlabel('Date/time')
     ax1.set_title('Ridgecrest Power')
     ax1.set_ylabel('Watts')
+    maxTime = 0             # maxTime is used to extend the LR Light data to the end of other data
+    plt.set_cmap('Dark2')
 
     if Verbosity >= 1: print("\n", callStack, "          ----------  HOUSE POWER ----------")
     query = "SELECT {timeField} AS 'Time', \
@@ -185,7 +201,8 @@ def ShowRCPower(DBConn, beginDate=None):
     if Verbosity >= 1: print(callStack, "House Power SQL: ", query)
     data = GetData(DBConn, 'HousePower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
-        data.plot(ax=ax1, colormap='Dark2')
+        data.plot(ax=ax1)
+        if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
 
@@ -195,6 +212,7 @@ def ShowRCPower(DBConn, beginDate=None):
     data = GetData(DBConn, 'HumidifierPower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
+        if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
 
@@ -204,15 +222,7 @@ def ShowRCPower(DBConn, beginDate=None):
     data = GetData(DBConn, 'FridgePower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
-    else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
-
-    if Verbosity >= 1: print("\n", callStack, "          ----------  LR LIGHT POWER ----------")
-    query = makeQuery(timeField='time', dataName='LR Light', tableName='lrlight_power')
-    if Verbosity >= 1: print(callStack, "LR Light SQL: ", query)
-    data = GetData(DBConn, 'LRLight.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
-    if len(data) > 0:
-        data.plot(ax=ax1)
+        if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
 
@@ -221,20 +231,33 @@ def ShowRCPower(DBConn, beginDate=None):
     if Verbosity >= 1: print(callStack, "AC Power SQL: ", query)
     data = GetData(DBConn, 'ACPower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
+        if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
         data.plot(ax=ax1)
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
 
+    if Verbosity >= 1: print("\n", callStack, "          ----------  LR LIGHT POWER ----------")
+    query = makeQuery(timeField='time', dataName='LR Light', tableName='lrlight_power')
+    if Verbosity >= 1: print(callStack, "LR Light SQL: ", query)
+    data = GetData(DBConn, 'LRLight.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    if len(data) > 0:
+        if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
+        data = pd.concat([data, pd.DataFrame({'LR Light': [data['LR Light'][-1]]}, index=[maxTime])])
+        data.plot(ax=ax1, drawstyle="steps-post")
+    else:
+        if Verbosity >= 1: print(callStack, "No data to plot")
+
+    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
     callStack.pop()
 
-def ShowRCLaundry(DBConn, beginDate=None):
+def ShowRCLaundry(DBConn):
     global Verbosity, callStack, filePath
     #############    Laundry Trap    #########
     callStack.append('ShowRCLaundry')
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    if beginDate == None: beginDate = twoWeeksAgo
+    beginDate = BeginTime
     fig = plt.figure(figsize=[15, 5])   #  Define a figure and set its size in inches.
     ax1 = fig.add_subplot(1, 1, 1)      #  Get reference to axes for labeling
     ax1.set_ylabel('°F')
@@ -257,22 +280,24 @@ def ShowRCLaundry(DBConn, beginDate=None):
         data.plot(ax=ax1)
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
+    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
     callStack.pop()
 
-def ShowRCSolar(DBConn, beginDate=None):
+def ShowRCSolar(DBConn):
     global Verbosity, callStack, filePath
     callStack.append('ShowRCSolar')
     ###############################  Solar Energy  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    if beginDate == None: beginDate = twoWeeksAgo
+    beginDate = BeginTime
     #  Setup the figure with two y axes
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
     ax1.set_xlabel('Date/time')
     ax1.set_title('Ridgecrest Solar')
     ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+    plt.set_cmap('Dark2')
 
     if Verbosity >= 1: print("\n", callStack, "          ----------  NORTH SOLAR ----------")
     query = "SELECT {timeField} AS 'Time', OutWattsNow AS 'North Array' \
@@ -281,7 +306,7 @@ def ShowRCSolar(DBConn, beginDate=None):
     if Verbosity >= 1: print(callStack, 'North Arrray query: ', query)
     data = GetData(DBConn, 'NorthArray.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
-        data.plot(ax=ax1, colormap='Dark2')
+        data.plot(ax=ax1)
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
     ax1.set_ylabel('Watts')  # we already handled the x-label with ax1
@@ -311,22 +336,24 @@ def ShowRCSolar(DBConn, beginDate=None):
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
     ax2.legend(loc=5)
+    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
     callStack.pop()
 
-def ShowRCWater(DBConn, beginDate=None):
+def ShowRCWater(DBConn):
     global Verbosity, callStack, filePath
     callStack.append('ShowRCWater')
     ###############################  Water  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    if beginDate == None: beginDate = twoWeeksAgo
+    beginDate = BeginTime
     #  Setup the figure with two y axes
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
     ax1.set_xlabel('Date/time')
     ax1.set_title('Ridgecrest Water')
     ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+    plt.set_cmap('Dark2')
 
 #
 #   Two queries since plotted on different axes.
@@ -339,7 +366,7 @@ def ShowRCWater(DBConn, beginDate=None):
     if Verbosity >= 1: print(callStack, 'GPM query: ', query)
     data = GetData(DBConn, 'GPM.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
-        data.plot(ax=ax1, colormap='Dark2')
+        data.plot(ax=ax1)
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
     ax1.set_ylabel('Gallons Per Minute')  # we already handled the x-label with ax1
@@ -358,21 +385,23 @@ def ShowRCWater(DBConn, beginDate=None):
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
     ax2.legend(loc=5)
+    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
     callStack.pop()
 
-def ShowRCTemps(DBConn, beginDate=None):
+def ShowRCTemps(DBConn):
     global Verbosity, callStack, filePath
     callStack.append('ShowRCTemps')
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    if beginDate == None: beginDate = twoWeeksAgo
+    beginDate = BeginTime
     ###############################  Temperatures  ############################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
     ax1.set_xlabel('Date/time')
     ax1.set_title('Ridgecrest Temperatures')
     ax1.set_ylabel('°F')
+    plt.set_cmap('Dark2')
 
     if Verbosity >= 1: print("\n", callStack, "          ----------  OUTSIDE / INSIDE TEMP  ----------")
     query = "SELECT {timeField} AS 'Time', OutsideTemp, InsideTemp AS 'Computer' \
@@ -380,7 +409,7 @@ def ShowRCTemps(DBConn, beginDate=None):
     if Verbosity >= 1: print(callStack, "Out, In Temp SQL: ", query)
     data = GetData(DBConn, 'RcWxTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
-        data.plot(ax=ax1, colormap='Dark2')
+        data.plot(ax=ax1)
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
 
@@ -438,21 +467,23 @@ def ShowRCTemps(DBConn, beginDate=None):
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
 
+    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
     callStack.pop()
 
-def ShowRCHums(DBConn, beginDate=None):
+def ShowRCHums(DBConn):
     global Verbosity, callStack, filePath
     callStack.append('ShowRCHums')
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    if beginDate == None: beginDate = twoWeeksAgo
+    beginDate = BeginTime
     ###############################  Humidities  ############################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
     ax1.set_xlabel('Date/time')
     ax1.set_title('Ridgecrest Humidities')
     ax1.set_ylabel('% HUMIDITY')
+    plt.set_cmap('Dark2')
 
     if Verbosity >= 1: print("\n", callStack, "          ----------  OUTSIDE / INSIDE HUMIDITY ----------")
     query = "SELECT {timeField} AS 'Time', OutsideHumidity AS 'Outside', InsideHumidity AS 'Computer' \
@@ -460,7 +491,7 @@ def ShowRCHums(DBConn, beginDate=None):
     if Verbosity >= 1: print(callStack, "Out, In Hum SQL: ", query)
     data = GetData(DBConn, 'RcWxHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
-        data.plot(ax=ax1, colormap='Dark2')
+        data.plot(ax=ax1)
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
 
@@ -518,15 +549,16 @@ def ShowRCHums(DBConn, beginDate=None):
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
 
+    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
     callStack.pop()
 
-def ShowRCHeaters(DBConn, beginDate=None):
+def ShowRCHeaters(DBConn):
     global Verbosity, callStack, filePath
     callStack.append('ShowRCHeaters')
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    if beginDate == None: beginDate = twoWeeksAgo
+    beginDate = BeginTime
     ###############################  HEATERS  ############################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -536,6 +568,7 @@ def ShowRCHeaters(DBConn, beginDate=None):
     ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
     ax2.set_ylabel('Watts')  # we already handled the x-label with ax1
     # ax2.tick_params('y')
+    plt.set_cmap('Dark2')
 
     if Verbosity >= 1: print("\n", callStack, "          ----------  COMPUTER TEMP ----------")
     query = "SELECT {timeField} AS 'Time', InsideTemp AS 'Computer' \
@@ -543,7 +576,7 @@ def ShowRCHeaters(DBConn, beginDate=None):
     if Verbosity >= 1: print(callStack, "Computer Temp SQL: ", query)
     data = GetData(DBConn, 'ComputerTemp.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
-        data.plot(ax=ax1, colormap='Dark2')
+        data.plot(ax=ax1)
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
 
@@ -597,7 +630,7 @@ def ShowRCHeaters(DBConn, beginDate=None):
     if Verbosity >= 1: print(callStack, "Dining H Power SQL: ", query)
     data = GetData(DBConn, 'ComputerHeaterWatts.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
-        data.plot(ax=ax2, colormap='Dark2')
+        data.plot(ax=ax2)
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
 
@@ -647,16 +680,17 @@ def ShowRCHeaters(DBConn, beginDate=None):
         if Verbosity >= 1: print(callStack, "No data to plot")
 
     # ax2.legend()
+    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
     callStack.pop()
 
-def ShowSSFurnace(DBConn, beginDate=None):
+def ShowSSFurnace(DBConn):
     global Verbosity, callStack, filePath
     callStack.append('ShowSSFurnace')
     ###############################  SS Furnace  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    if beginDate == None: beginDate = twoWeeksAgo
+    beginDate = BeginTime
     fig = plt.figure(figsize=[15, 5])   #  Define a figure and set its size in inches.
     ax1 = fig.add_subplot(1, 1, 1)      #  Get reference to axes for labeling
   # ax1.set_ylabel('°F')
@@ -682,15 +716,16 @@ def ShowSSFurnace(DBConn, beginDate=None):
         data.plot(ax=ax1)
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
+    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
     callStack.pop()
 
-def ShowSSTemps(DBConn, beginDate=None):
+def ShowSSTemps(DBConn):
     global Verbosity, callStack, filePath
     callStack.append('ShowSSTemps')
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    if beginDate == None: beginDate = twoWeeksAgo
+    beginDate = BeginTime
     ###############################  SS Temperatures  ##########################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -756,15 +791,16 @@ def ShowSSTemps(DBConn, beginDate=None):
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
 
+    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
     callStack.pop()
 
-def ShowSSHums(DBConn, beginDate=None):
+def ShowSSHums(DBConn):
     global Verbosity, callStack, filePath
     callStack.append('ShowSSHums')
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    if beginDate == None: beginDate = twoWeeksAgo
+    beginDate = BeginTime
     ###############################  SS Humidities    ##########################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -830,16 +866,19 @@ def ShowSSHums(DBConn, beginDate=None):
     else:
         if Verbosity >= 1: print(callStack, "No data to plot")
 
+    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
     callStack.pop()
 
 def main():
     global Verbosity, callStack, filePath, ServerTimeFromUTC, twoWeeksAgo, ServerTimeFromUTCSec, DelOldCsv, haschema, myschema
+    global BeginTime
     callStack.append('main')
     RCGraphs = {'solar', 'laundry', 'hums', 'temps', 'water', 'power', 'heaters'}
     SSGraphs = {'Furnace', 'Temps', 'Hums'}
     parser = argparse.ArgumentParser(description = 'Display graphs of home parameters.\nDefaults to show all.')
+    parser.add_argument("-d", "--days", dest="days", action="store", help="Number of days of data to plot", default=14)
     parser.add_argument("-l", "--laundry", dest="laundry", action="store_true", help="Show Ridgecrest Laundry Trap graph.")
     parser.add_argument("-s", "--solar", dest="solar", action="store_true", help="Show Ridgecrest Solar graph.")
     parser.add_argument("-u", "--humidities", dest="hums", action="store_true", help="Show Ridgecrest Humidities graph.")
@@ -855,9 +894,13 @@ def main():
     args = parser.parse_args()
     Verbosity = args.verbosity
     DelOldCsv = args.DeleteOld
+    numDays = float(args.days)
+
     command_line_args = {k for k, v in vars(args).items() if v}
     command_line_args.discard('verbosity')      # verbosity not a plotting item
     command_line_args.discard('DeleteOldCSVData')      # DeleteOldCSVData not a plotting item
+    command_line_args.discard('days')      # number of days is not a plotting item
+
     if len(command_line_args) == 0:     # no options given, provide a default set.
         command_line_args = SSGraphs.union(RCGraphs)        # all graphs
     if Verbosity >= 1:         print(callStack, command_line_args)
@@ -877,6 +920,13 @@ def main():
         port = cfg['rc_database_port']
         haschema = cfg['rc_ha_schema']
         myschema = cfg['rc_my_schema']
+        if Verbosity >= 2:
+            print(callStack, "RC user", user)
+            print(callStack, "RC pwd", pwd)
+            print(callStack, "RC host", host)
+            print(callStack, "RC port", port)
+            print(callStack, "RC haschema", haschema)
+            print(callStack, "RC myschema", myschema)
 
         connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=haschema)
         if Verbosity >= 1: print(callStack, "RC database connection string:", connstr)
@@ -888,6 +938,7 @@ def main():
                 ServerTimeFromUTC = timedelta(hours=row[0])
                 ServerTimeFromUTCSec = ServerTimeFromUTC.days*86400+ServerTimeFromUTC.seconds
             twoWeeksAgo = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=14))
+            BeginTime = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
             if Verbosity >= 1:
                 print(callStack, "RC Server time offset from UTC: ", ServerTimeFromUTC)
                 print(callStack, "RC Server time offset from UTC (seconds): ", ServerTimeFromUTCSec)
@@ -907,6 +958,13 @@ def main():
         port = cfg['ss_database_port']
         haschema = cfg['ss_ha_schema']
         myschema = cfg['ss_my_schema']
+        if Verbosity >= 2:
+            print(callStack, "SS user", user)
+            print(callStack, "SS pwd", pwd)
+            print(callStack, "SS host", host)
+            print(callStack, "SS port", port)
+            print(callStack, "SS haschema", haschema)
+            print(callStack, "SS myschema", myschema)
 
         connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=haschema)
         if Verbosity >= 1: print(callStack, "SS database connection string:", connstr)
@@ -918,6 +976,7 @@ def main():
                 ServerTimeFromUTC = timedelta(hours=row[0])
                 ServerTimeFromUTCSec = ServerTimeFromUTC.days*86400+ServerTimeFromUTC.seconds
             twoWeeksAgo = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=14))
+            BeginTime = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
             if Verbosity >= 1:
                 print(callStack, "SS Server time offset from UTC: ", ServerTimeFromUTC)
                 print(callStack, "SS Server time offset from UTC (seconds): ", ServerTimeFromUTCSec)

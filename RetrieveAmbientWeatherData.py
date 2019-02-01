@@ -88,7 +88,7 @@ def main():
             print(callStack, "SS Server time offset from UTC: ", ServerTimeFromUTC, flush=True)
             print(callStack, "SS Server time offset from UTC (seconds): ",
                 ServerTimeFromUTCSec, flush=True)
-        Ambient_api = ambientapi.AmbientAPI(AMBIENT_ENDPOINT=rmdpoint \
+        Ambient_api = ambientapi.AmbientAPI(AMBIENT_ENDPOINT=endpoint \
             , AMBIENT_API_KEY=api_key \
             # log_levels are: debug, info, warning, error, critical, console (just prints message)
             # log_file is ignored if log_level is 'console'

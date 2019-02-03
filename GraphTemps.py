@@ -355,9 +355,9 @@ def ShowRCWater(DBConn):
     ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
     plt.set_cmap('Dark2')
 
-#
-#   Two queries since plotted on different axes.
-#
+    #
+    #   Two queries since plotted on different axes.
+    #
     if Verbosity >= 1: print("\n", callStack, "          ----------  GALLONS PER MIN   ----------")
     query = "SELECT {timeField} AS 'Time', \
         GPM AS 'Gallons/min' \

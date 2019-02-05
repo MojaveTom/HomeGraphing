@@ -19,8 +19,11 @@ import datetime
 from datetime import date
 from datetime import timedelta
 from datetime import datetime
+import os
 import argparse
+import sys
 import time
+import configparser
 
 from ambient_api import ambientapi
 import json
@@ -70,7 +73,7 @@ def main():
     myschema = cfg['ss_inserter_schema']
     endpoint = cfg['ambient_endpoint']
     api_key = cfg['ambient_api_key']
-    ap_key - cfg['ambient_application_key']
+    app_key = cfg['ambient_application_key']
 
     connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=myschema)
     if Verbosity >= 1: print(callStack, "SS weather database connection string:", connstr)
@@ -142,11 +145,8 @@ def main():
             if Verbosity >= 2:
                 print(callStack, "Weather device data:", wdata, flush=True)
             for dp in wdata:
-                insertsql = "INSERT IGNORE INTO `"+myschema+""`.`weather` " \
-                        + str(tuple(dp.keys())).replace("'", "") \
-                        + " VALUES " \
-                        + str(tuple(dp.values())).replace("Z","") \
-                        + " ON DUPLICATE KEY UPDATE date = VALUES(date)"
+                insertsql = "INSERT IGNORE INTO `"+myschema+"`.`weather` "+str(tuple(dp.keys())).replace("'", "") \
+                    +" VALUES "+str(tuple(dp.values())).replace("Z","")+" ON DUPLICATE KEY UPDATE date = VALUES(date)"
                 if Verbosity >= 3:
                     print(callStack, "Insert SQL: ", insertsql, flush=True)
                 try:
@@ -171,7 +171,7 @@ def main():
                 if Verbosity >= 2:
                     print(callStack, "Weather device data:", wdata, flush=True)
                 for dp in wdata:
-                    insertsql = "INSERT IGNORE INTO `"+myschema+""`.`weather` " \
+                    insertsql = "INSERT IGNORE INTO `"+myschema+"`.`weather` " \
                             + str(tuple(dp.keys())).replace("'", "") \
                             + " VALUES " \
                             + str(tuple(dp.values())).replace("Z","") \

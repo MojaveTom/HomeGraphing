@@ -11,16 +11,51 @@ import datetime
 from datetime import date
 from datetime import timedelta
 from datetime import datetime
-import configparser
-
 import os
 import argparse
 import sys
+import configparser
+import logging
+import logging.config
+import logging.handlers
+import json
 
-#  global Verbosity, callStack, twoWeeksAgo, filePath
-Verbosity = 0
+ProgName, ext = os.path.splitext(os.path.basename(sys.argv[0]))
+ProgPath = os.path.dirname(sys.argv[0])
+logConfFileName = os.path.join(ProgPath, ProgName + '_loggingconf.json')
+if os.path.isfile(logConfFileName):
+    try:
+        with open(logConfFileName, 'r') as logging_configuration_file:
+            config_dict = json.load(logging_configuration_file)
+        logging.config.dictConfig(config_dict)
+    except:
+        print("loading logger config from file failed.")
+        pass
+
+logger = logging.getLogger(__name__)
+logger.info('logger name is: "%s"', logger.name)
+logging.getLogger('matplotlib.axes._base').setLevel('WARNING')      # turn off matplotlib info & debug messages
+logging.getLogger('matplotlib.font_manager').setLevel('WARNING')
+
+DBConn = None
+DBCursor = None
+Topics = []    # default topics to subscribe
+mqtt_msg_table = None
+RequiredConfigParams = frozenset(('ss_ha_schema', 'rc_ha_schema', 'rc_my_schema', 'ss_my_schema', 'rc_database_host', 'rc_database_port', 'ss_database_host', 'ss_database_port', 'database_reader_user', 'database_reader_password'))
+
+def GetConfigFilePath():
+    fp = os.path.join(ProgPath, 'secrets.ini')
+    if not os.path.isfile(fp):
+        fp = os.environ['PrivateConfig']
+        if not os.path.isfile(fp):
+            logger.error('No configuration file found.')
+            sys.exit(1)
+    logger.info('Using configuration file at: %s', fp)
+    return fp
+    
+
+#  global twoWeeksAgo, filePath
 DelOldCsv = False
-callStack = []
 twoWeeksAgo = (datetime.today() - timedelta(days=14))
 filePath = os.path.abspath(os.path.join(os.environ['HOME'], 'GraphingData'))
 ServerTimeFromUTC = timedelta(hours=0)
@@ -34,14 +69,14 @@ BeginTime = None       # Number of days to plot
 
 def makeQuery(dataName, tableName, timeField='time', databaseName=None):
     global myschema
-    callStack.append('makeQuery')
+
     if databaseName is None: databaseName = myschema
     query = "SELECT {timeField} AS 'Time', value AS '{dataName}' \
     FROM `{databaseName}`.`{tableName}` \
     WHERE {timeField} > '%s' \
     ORDER BY {timeField}".format(timeField=timeField, dataName=dataName, tableName=tableName, databaseName=databaseName)
-    if Verbosity >= 2: print(callStack, "generated query is: ", query)
-    callStack.pop()
+    logger.debug("generated query is: %s", query)
+
     return query
 
 def GetData(DBConn, fileName, query, beginDate, dataTimeOffsetUTC=timedelta(0)):
@@ -90,98 +125,96 @@ def GetData(DBConn, fileName, query, beginDate, dataTimeOffsetUTC=timedelta(0)):
 
         Another example:???
     """
-    global Verbosity, callStack, filePath
-    callStack.append('GetData')
-    if Verbosity >= 2: print(callStack, 'call args beginDate = ', beginDate, ' dataTimeOffsetUTC = ', dataTimeOffsetUTC)
+    global filePath
+
+    logger.debug('call args beginDate = %s dataTimeOffsetUTC = %s', beginDate, dataTimeOffsetUTC)
     slicer = 'index > "%s"'%(beginDate + dataTimeOffsetUTC).isoformat()     # pandas "query" to remove old data FROM csv data
-    if Verbosity >= 1: print(callStack, 'slicer = ', slicer)
+    logger.info('slicer = %s', slicer)
     theFile = os.path.join(filePath, fileName)
-    if Verbosity >= 1: print(callStack, 'theFile: ', theFile)
+    logger.info('theFile: %s', theFile)
     CSVdataRead = False     # flag is true if we read csv data
     if  os.path.exists(theFile):
         if DelOldCsv:
             os.remove(theFile)
-            if Verbosity >= 1: print(callStack, 'CSV file deleted.')
+            logger.info('CSV file deleted.')
         else:
             fdata = pd.read_csv(theFile, index_col=0, parse_dates=True)
-            if Verbosity >= 2: print(callStack, 'Num Points from CSV = ', fdata.size)
+            logger.debug('Num Points from CSV = %s', fdata.size)
             if (fdata.size > 0) and (fdata.index[0] <= beginDate):
                 beginDate = fdata.index[-1]
-                if Verbosity >= 2: print(callStack, 'Last CSV time = new beginDate = ', beginDate)
-                if Verbosity >= 3: print(callStack, 'CSVdata tail:\n', fdata.tail())
-                if Verbosity >= 4: print(callStack, 'CSVdata dtypes:\n', fdata.dtypes)
-                if Verbosity >= 4: print(callStack, 'CSVdata columns:\n', fdata.columns)
-                if Verbosity >= 4: print(callStack, 'CSVdata index:\n', fdata.index)
+                logger.debug('Last CSV time = new beginDate = %s', beginDate)
+                logger.debug('CSVdata tail:\n%s', fdata.tail())
+                logger.debug('CSVdata dtypes:\n%s', fdata.dtypes)
+                logger.debug('CSVdata columns:\n%s', fdata.columns)
+                logger.debug('CSVdata index:\n%s', fdata.index)
                 CSVdataRead = True
-            elif (Verbosity >= 1) and (fdata.size <= 0):
-                print(callStack, "CSV file exists but has no data.") 
-            elif (Verbosity >= 1) and (fdata.size > 0) and (fdata.index[0] > beginDate):
-                print(callStack, "CSV data all more recent than desired data; ignore it.")
+            elif (fdata.size <= 0):
+                logger.info("CSV file exists but has no data.") 
+            elif (fdata.size > 0) and (fdata.index[0] > beginDate):
+                logger.debug("CSV data all more recent than desired data; ignore it.")
             else:
                 pass
     else:
-        if Verbosity >= 2: print(callStack, 'CSV file does not exist.')
+        logger.debug('CSV file does not exist.')
         pass
     beginDate = beginDate - ServerTimeFromUTC + dataTimeOffsetUTC
-    if Verbosity >= 2:
-        print(callStack, 'beginDate after CSV modified for SQL = ', beginDate)
-        print(callStack, "Comparing: now UTC time:", datetime.utcnow(), "and UTC data time:", (beginDate - dataTimeOffsetUTC))
+    logger.debug('beginDate after CSV modified for SQL = %s', beginDate)
+    logger.debug("Comparing: now UTC time: %s and UTC data time: %s", datetime.utcnow(), (beginDate - dataTimeOffsetUTC))
     if (not CSVdataRead) or (datetime.utcnow() - beginDate + dataTimeOffsetUTC) > timedelta(minutes=20):
         myQuery = query%beginDate.isoformat()
-        if Verbosity >= 1: print(callStack, 'SQL query: ', myQuery)
+        logger.info('SQL query: %s', myQuery)
         data = pd.read_sql_query(myQuery, DBConn, index_col='Time')
         if data.index.size != 0:
                 # Have SQL data
-            if Verbosity >= 2: print(callStack, 'Num Points from SQL = ', data.index.size)
-            if Verbosity >= 3: print(callStack, 'sql data head:\n', data.head())
-            if Verbosity >= 3: print(callStack, 'sql data tail:\n', data.tail())
-            if Verbosity >= 4: print(callStack, 'sql data dtypes:\n', data.dtypes)
-            if Verbosity >= 4: print(callStack, 'sql data columns:\n', data.columns)
-            if Verbosity >= 4: print(callStack, 'sql data index:\n', data.index)
+            logger.debug('Num Points from SQL = %s', data.index.size)
+            logger.debug('sql data head:\n%s', data.head())
+            logger.debug('sql data tail:\n%s', data.tail())
+            logger.debug('sql data dtypes:\n%s', data.dtypes)
+            logger.debug('sql data columns:\n%s', data.columns)
+            logger.debug('sql data index:\n%s', data.index)
             if CSVdataRead:
                 #  Have SQL data and have CSV data, put them together
                 data =  fdata.append(data)
-                if Verbosity >= 3: print(callStack, 'appended data tail:\n', data.tail())
-                if Verbosity >= 4: print(callStack, 'appended data dtypes:\n', data.dtypes)
-                if Verbosity >= 4: print(callStack, 'appended data columns:\n', data.columns)
-                if Verbosity >= 4: print(callStack, 'appended data index:\n', data.index)
+                logger.debug('appended data tail:\n%s', data.tail())
+                logger.debug('appended data dtypes:\n%s', data.dtypes)
+                logger.debug('appended data columns:\n%s', data.columns)
+                logger.debug('appended data index:\n%s', data.index)
                 pass
             else:
-                if Verbosity >= 2: print(callStack, 'No CSV data to which to append SQL data.')
+                logger.debug('No CSV data to which to append SQL data.')
                 pass    # No CSV data in fdata; SQL data in data
         else:
             # No SQL data
-            if Verbosity >= 2: print(callStack, 'No Sql data read.')
+            logger.debug('No Sql data read.')
             if CSVdataRead:
                 # Have CSV data, no SQL data; copy CSV data to output dataFrame
                 data = fdata
             else:
-                if Verbosity >= 2: print(callStack, 'No CSV data AND no SQL data!!')
+                logger.debug('No CSV data AND no SQL data!!')
                 pass    # No CSV data, no SQL data:  punt??
             pass
     else:
-        if Verbosity >= 2:
-            print(callStack, "CSV data is recent enough; don't query database. ")
-            print(callStack, "now", datetime.utcnow(), "beginDate", beginDate, "diff", (datetime.utcnow() - beginDate))
+        logger.info("CSV data is recent enough; don't query database. ")
+        logger.debug("now %s beginDate %s diff %s", datetime.utcnow(), beginDate, (datetime.utcnow() - beginDate))
         data = fdata
         pass
 
     # Only save two weeks of data in the CSV file
     data.query('index > "%s"'%(twoWeeksAgo + dataTimeOffsetUTC).isoformat()).to_csv(theFile, index='Time')
-    callStack.pop()
+
     # in "context" of calling function
     tag = os.path.splitext(fileName)[0]
-    if Verbosity >= 3: print(callStack, tag, 'head:\n', data.head())
-    if Verbosity >= 3: print(callStack, tag, 'tail:\n', data.tail())
-    if Verbosity >= 4: print(callStack, tag, 'dtypes:\n', data.dtypes)
-    if Verbosity >= 4: print(callStack, tag, 'columns:\n', data.columns)
-    if Verbosity >= 4: print(callStack, tag, 'index:\n', data.index)
+    logger.debug('head:\n%s', data.head())
+    logger.debug('tail:\n%s', data.tail())
+    logger.debug('dtypes:\n%s', data.dtypes)
+    logger.debug('columns:\n%s', data.columns)
+    logger.debug('index:\n%s', data.index)
 
     return data.query(slicer)       # return data from beginDate to  present
 
 def ShowRCPower(DBConn):
-    global Verbosity, callStack, filePath, ServerTimeFromUTC
-    callStack.append('ShowRCPower')
+    global filePath, ServerTimeFromUTC
+
     ###############################  POWER  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
     beginDate = BeginTime
@@ -193,69 +226,69 @@ def ShowRCPower(DBConn):
     maxTime = 0             # maxTime is used to extend the LR Light data to the end of other data
     plt.set_cmap('Dark2')
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  HOUSE POWER ----------")
+    logger.info("          ----------  HOUSE POWER ----------")
     query = "SELECT {timeField} AS 'Time', \
         HousePowerW AS 'House' \
         FROM `{schema}`.`MeterData` WHERE \
         {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    if Verbosity >= 1: print(callStack, "House Power SQL: ", query)
+    logger.info("House Power SQL: %s", query)
     data = GetData(DBConn, 'HousePower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
         if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  HUMIDIFIER POWER ----------")
+    logger.info("          ----------  HUMIDIFIER POWER ----------")
     query = makeQuery(timeField='time', dataName='Humidifier', tableName='humidifier_power')
-    if Verbosity >= 1: print(callStack, "Humidifier power SQL: ", query)
+    logger.info("Humidifier power SQL: %s", query)
     data = GetData(DBConn, 'HumidifierPower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
         if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  FRIDGE POWER ----------")
+    logger.info("          ----------  FRIDGE POWER ----------")
     query = makeQuery(timeField='time', dataName='Refrigerator', tableName='fridge_power')
-    if Verbosity >= 1: print(callStack, "Fridge Power SQL: ", query)
+    logger.info("Fridge Power SQL: %s", query)
     data = GetData(DBConn, 'FridgePower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
         if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  A/C POWER ----------")
+    logger.info("          ----------  A/C POWER ----------")
     query = makeQuery(timeField='time', dataName='A/C Power', tableName='ac_power')
-    if Verbosity >= 1: print(callStack, "AC Power SQL: ", query)
+    logger.info("AC Power SQL: %s", query)
     data = GetData(DBConn, 'ACPower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  LR LIGHT POWER ----------")
+    logger.info("          ----------  LR LIGHT POWER ----------")
     query = makeQuery(timeField='time', dataName='LR Light', tableName='lrlight_power')
-    if Verbosity >= 1: print(callStack, "LR Light SQL: ", query)
+    logger.info("LR Light SQL: %s", query)
     data = GetData(DBConn, 'LRLight.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
         data = pd.concat([data, pd.DataFrame({'LR Light': [data['LR Light'][-1]]}, index=[maxTime])])
         data.plot(ax=ax1, drawstyle="steps-post")
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
     ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
-    callStack.pop()
+
 
 def ShowRCLaundry(DBConn):
-    global Verbosity, callStack, filePath
+    global filePath
     #############    Laundry Trap    #########
-    callStack.append('ShowRCLaundry')
+
             # Supply default beginDate from CURRENT value of twoWeeksAgo
     beginDate = BeginTime
     fig = plt.figure(figsize=[15, 5])   #  Define a figure and set its size in inches.
@@ -264,7 +297,7 @@ def ShowRCLaundry(DBConn):
     ax1.set_xlabel('Date/time')
     ax1.set_title('Ridgecrest Laundry Trap')
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  LAUNDRY TRAP ----------")
+    logger.info("          ----------  LAUNDRY TRAP ----------")
     query = "SELECT {timeField} AS 'Time', \
         TrapTemperature*9/5+32 AS 'Trap', \
         HotWaterValveTemp*9/5+32 AS 'HW',\
@@ -274,20 +307,20 @@ def ShowRCLaundry(DBConn):
         FROM `{schema}`.`FreezeProtection` \
         WHERE {timeField} > '%s' \
         ORDER BY {timeField}".format(timeField='CollectionTime', schema=myschema)
-    if Verbosity >= 1: print(callStack, 'Laundry query:\n', query)
+    logger.info('Laundry query:\n%s', query)
     data = GetData(DBConn, 'LaundryTrap.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
     ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
-    callStack.pop()
+
 
 def ShowRCSolar(DBConn):
-    global Verbosity, callStack, filePath
-    callStack.append('ShowRCSolar')
+    global filePath
+
     ###############################  Solar Energy  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
     beginDate = BeginTime
@@ -299,51 +332,51 @@ def ShowRCSolar(DBConn):
     ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
     plt.set_cmap('Dark2')
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  NORTH SOLAR ----------")
+    logger.info("          ----------  NORTH SOLAR ----------")
     query = "SELECT {timeField} AS 'Time', OutWattsNow AS 'North Array' \
         FROM `{schema}`.`SolarEnergy` WHERE Name = 'North Array' AND \
         {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    if Verbosity >= 1: print(callStack, 'North Arrray query: ', query)
+    logger.info('North Arrray query: %s', query)
     data = GetData(DBConn, 'NorthArray.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
     ax1.set_ylabel('Watts')  # we already handled the x-label with ax1
     ax1.legend(loc=2)
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  SOUTH SOLAR ----------")
+    logger.info("          ----------  SOUTH SOLAR ----------")
     query = "SELECT {timeField} AS 'Time', OutWattsNow AS 'South Array' \
         FROM `{schema}`.`SolarEnergy` WHERE Name = 'South Array' AND \
         {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    if Verbosity >= 1: print(callStack, 'South Arrray query: ', query)
+    logger.info('South Arrray query: %s', query)
     data = GetData(DBConn, 'SouthArray.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
     ax1.set_ylabel('Watts')  # we already handled the x-label with ax1
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  SOLAR RADIATION ----------")
+    logger.info("          ----------  SOLAR RADIATION ----------")
     query = "SELECT {timeField} AS 'Time', SolarRad FROM `{schema}`.`Weather` \
         WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    if Verbosity >= 1: print(callStack, 'SolarRad query: ', query)
+    logger.info('SolarRad query: %s', query)
     data = GetData(DBConn, 'SolarRad.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     ax2.set_ylabel('W/m^2', color='tab:red')  # we already handled the x-label with ax1
     ax2.tick_params('y', colors='tab:red')
     if len(data) > 0:
         data.plot(ax=ax2, color='tab:red')
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
     ax2.legend(loc=5)
     ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
-    callStack.pop()
+
 
 def ShowRCWater(DBConn):
-    global Verbosity, callStack, filePath
-    callStack.append('ShowRCWater')
+    global filePath
+
     ###############################  Water  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
     beginDate = BeginTime
@@ -358,41 +391,41 @@ def ShowRCWater(DBConn):
     #
     #   Two queries since plotted on different axes.
     #
-    if Verbosity >= 1: print("\n", callStack, "          ----------  GALLONS PER MIN   ----------")
+    logger.info("          ----------  GALLONS PER MIN   ----------")
     query = "SELECT {timeField} AS 'Time', \
         GPM AS 'Gallons/min' \
         FROM `{schema}`.`MeterData` WHERE \
         {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    if Verbosity >= 1: print(callStack, 'GPM query: ', query)
+    logger.info('GPM query: %s', query)
     data = GetData(DBConn, 'GPM.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
     ax1.set_ylabel('Gallons Per Minute')  # we already handled the x-label with ax1
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  WATER SYS POWER   ----------")
+    logger.info("          ----------  WATER SYS POWER   ----------")
     query = "SELECT {timeField} AS 'Time', \
         AvgWaterPowerW AS 'Well Power' \
         FROM `{schema}`.`MeterData` WHERE \
         {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    if Verbosity >= 1: print(callStack, 'WellPower query: ', query)
+    logger.info('WellPower query: %s', query)
     data = GetData(DBConn, 'WellPower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     ax2.set_ylabel('Watts', color='tab:red')  # we already handled the x-label with ax1
     ax2.tick_params('y', colors='tab:red')
     if len(data) > 0:
         data.plot(ax=ax2, color='tab:red')
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
     ax2.legend(loc=5)
     ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
-    callStack.pop()
+
 
 def ShowRCTemps(DBConn):
-    global Verbosity, callStack, filePath
-    callStack.append('ShowRCTemps')
+    global filePath
+
             # Supply default beginDate from CURRENT value of twoWeeksAgo
     beginDate = BeginTime
     ###############################  Temperatures  ############################################
@@ -403,78 +436,78 @@ def ShowRCTemps(DBConn):
     ax1.set_ylabel('°F')
     plt.set_cmap('Dark2')
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  OUTSIDE / INSIDE TEMP  ----------")
+    logger.info("          ----------  OUTSIDE / INSIDE TEMP  ----------")
     query = "SELECT {timeField} AS 'Time', OutsideTemp, InsideTemp AS 'Computer' \
         FROM `{schema}`.`weather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    if Verbosity >= 1: print(callStack, "Out, In Temp SQL: ", query)
+    logger.info("Out, In Temp SQL: %s", query)
     data = GetData(DBConn, 'RcWxTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  THERMOSTAT TEMP  ----------")
+    logger.info("          ----------  THERMOSTAT TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Thermostat', tableName='thermostat_temp')
-    if Verbosity >= 1: print(callStack, "Thermostat temp SQL: ", query)
+    logger.info("Thermostat temp SQL: %s", query)
     data = GetData(DBConn, 'ThermostatTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  DINING TEMP  ----------")
+    logger.info("          ----------  DINING TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Dining', tableName='dining_temp')
-    if Verbosity >= 1: print(callStack, "Dining temp SQL: ", query)
+    logger.info("Dining temp SQL: %s", query)
     data = GetData(DBConn, 'DiningTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  GUEST TEMP  ----------")
+    logger.info("          ----------  GUEST TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Guest', tableName='guest_temp')
-    if Verbosity >= 1: print(callStack, "Guest temp SQL: ", query)
+    logger.info("Guest temp SQL: %s", query)
     data = GetData(DBConn, 'GuestTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  KITCHEN TEMP  ----------")
+    logger.info("          ----------  KITCHEN TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_temp')
-    if Verbosity >= 1: print(callStack, "Kitchen temp SQL: ", query)
+    logger.info("Kitchen temp SQL: %s", query)
     data = GetData(DBConn, 'KitchenTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  MASTER TEMP  ----------")
+    logger.info("          ----------  MASTER TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Master', tableName='master_temp')
-    if Verbosity >= 1: print(callStack, "Master temp SQL: ", query)
+    logger.info("Master temp SQL: %s", query)
     data = GetData(DBConn, 'MasterTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  LIVING TEMP  ----------")
+    logger.info("          ----------  LIVING TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Living', tableName='living_temp')
-    if Verbosity >= 1: print(callStack, "Living temp SQL: ", query)
+    logger.info("Living temp SQL: %s", query)
     data = GetData(DBConn, 'LivingTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
     ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
-    callStack.pop()
+
 
 def ShowRCHums(DBConn):
-    global Verbosity, callStack, filePath
-    callStack.append('ShowRCHums')
+    global filePath
+
             # Supply default beginDate from CURRENT value of twoWeeksAgo
     beginDate = BeginTime
     ###############################  Humidities  ############################################
@@ -485,78 +518,78 @@ def ShowRCHums(DBConn):
     ax1.set_ylabel('% HUMIDITY')
     plt.set_cmap('Dark2')
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  OUTSIDE / INSIDE HUMIDITY ----------")
+    logger.info("          ----------  OUTSIDE / INSIDE HUMIDITY ----------")
     query = "SELECT {timeField} AS 'Time', OutsideHumidity AS 'Outside', InsideHumidity AS 'Computer' \
         FROM `{schema}`.`weather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    if Verbosity >= 1: print(callStack, "Out, In Hum SQL: ", query)
+    logger.info("Out, In Hum SQL: %s", query)
     data = GetData(DBConn, 'RcWxHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  THERMOSTAT HUMIDITY ----------")
+    logger.info("          ----------  THERMOSTAT HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Thermostat', tableName='thermostat_hum')
-    if Verbosity >= 1: print(callStack, "Thermostat Hum SQL: ", query)
+    logger.info("Thermostat Hum SQL: %s", query)
     data = GetData(DBConn, 'ThermostatHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  DINING HUMIDITY ----------")
+    logger.info("          ----------  DINING HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Dining', tableName='dining_hum')
-    if Verbosity >= 1: print(callStack, "Dining Hum SQL: ", query)
+    logger.info("Dining Hum SQL: %s", query)
     data = GetData(DBConn, 'DiningHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  GUEST HUMIDITY ----------")
+    logger.info("          ----------  GUEST HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Guest', tableName='guest_hum')
-    if Verbosity >= 1: print(callStack, "Guest Hum SQL: ", query)
+    logger.info("Guest Hum SQL: %s", query)
     data = GetData(DBConn, 'GuestHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  KITCHEN HUMIDITY ----------")
+    logger.info("          ----------  KITCHEN HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_hum')
-    if Verbosity >= 1: print(callStack, "Kitchen Hum SQL: ", query)
+    logger.info("Kitchen Hum SQL: %s", query)
     data = GetData(DBConn, 'KitchenHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  MASTER HUMIDITY ----------")
+    logger.info("          ----------  MASTER HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Master', tableName='master_hum')
-    if Verbosity >= 1: print(callStack, "Master Hum SQL: ", query)
+    logger.info("Master Hum SQL: %s", query)
     data = GetData(DBConn, 'MasterHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  LIVING HUMIDITY ----------")
+    logger.info("          ----------  LIVING HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Living', tableName='living_hum')
-    if Verbosity >= 1: print(callStack, "Living Hum SQL: ", query)
+    logger.info("Living Hum SQL: %s", query)
     data = GetData(DBConn, 'LivingHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
     ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
-    callStack.pop()
+
 
 def ShowRCHeaters(DBConn):
-    global Verbosity, callStack, filePath
-    callStack.append('ShowRCHeaters')
+    global filePath
+
             # Supply default beginDate from CURRENT value of twoWeeksAgo
     beginDate = BeginTime
     ###############################  HEATERS  ############################################
@@ -570,124 +603,123 @@ def ShowRCHeaters(DBConn):
     # ax2.tick_params('y')
     plt.set_cmap('Dark2')
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  COMPUTER TEMP ----------")
+    logger.info("          ----------  COMPUTER TEMP ----------")
     query = "SELECT {timeField} AS 'Time', InsideTemp AS 'Computer' \
         FROM `{schema}`.`weather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    if Verbosity >= 1: print(callStack, "Computer Temp SQL: ", query)
+    logger.info("Computer Temp SQL: %s", query)
     data = GetData(DBConn, 'ComputerTemp.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  DINING TEMP  ----------")
+    logger.info("          ----------  DINING TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Dining', tableName='dining_temp')
-    if Verbosity >= 1: print(callStack, "Dining temp SQL: ", query)
+    logger.info("Dining temp SQL: %s", query)
     data = GetData(DBConn, 'DiningTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  GUEST TEMP  ----------")
+    logger.info("          ----------  GUEST TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Guest', tableName='guest_temp')
-    if Verbosity >= 1: print(callStack, "Guest temp SQL: ", query)
+    logger.info("Guest temp SQL: %s", query)
     data = GetData(DBConn, 'GuestTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  KITCHEN TEMP  ----------")
+    logger.info("          ----------  KITCHEN TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_temp')
-    if Verbosity >= 1: print(callStack, "Kitchen temp SQL: ", query)
+    logger.info("Kitchen temp SQL: %s", query)
     data = GetData(DBConn, 'KitchenTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  MASTER TEMP  ----------")
+    logger.info("          ----------  MASTER TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Master', tableName='master_temp')
-    if Verbosity >= 1: print(callStack, "Master temp SQL: ", query)
+    logger.info("Master temp SQL: %s", query)
     data = GetData(DBConn, 'MasterTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  LIVING TEMP  ----------")
+    logger.info("          ----------  LIVING TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Living', tableName='living_temp')
-    if Verbosity >= 1: print(callStack, "Living temp SQL: ", query)
+    logger.info("Living temp SQL: %s", query)
     data = GetData(DBConn, 'LivingTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  COMPUTER HEATER POWER  ----------")
+    logger.info("          ----------  COMPUTER HEATER POWER  ----------")
     query = makeQuery(timeField='time', dataName='Computer', tableName='computer_heater_power')
-    if Verbosity >= 1: print(callStack, "Dining H Power SQL: ", query)
+    logger.info("Dining H Power SQL: %s", query)
     data = GetData(DBConn, 'ComputerHeaterWatts.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax2)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  DINING HEATER POWER  ----------")
+    logger.info("          ----------  DINING HEATER POWER  ----------")
     query = makeQuery(timeField='time', dataName='Dining', tableName='dining_heater_power')
-    if Verbosity >= 1: print(callStack, "Dining H Power SQL: ", query)
+    logger.info("Dining H Power SQL: %s", query)
     data = GetData(DBConn, 'DiningHeaterWatts.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax2)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  GUEST HEATER POWER  ----------")
+    logger.info("          ----------  GUEST HEATER POWER  ----------")
     query = makeQuery(timeField='time', dataName='Guest', tableName='guest_heater_power')
-    if Verbosity >= 1: print(callStack, "Guest H Power SQL: ", query)
+    logger.info("Guest H Power SQL: %s", query)
     data = GetData(DBConn, 'GuestHeaterWatts.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax2)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  KITCHEN HEATER POWER  ----------")
+    logger.info("          ----------  KITCHEN HEATER POWER  ----------")
     query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_heater_power')
-    if Verbosity >= 1: print(callStack, "Kitchen H Power SQL: ", query)
+    logger.info("Kitchen H Power SQL: %s", query)
     data = GetData(DBConn, 'KitchenHeaterWatts.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax2)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  MASTER HEATER POWER  ----------")
+    logger.info("          ----------  MASTER HEATER POWER  ----------")
     query = makeQuery(timeField='time', dataName='Master', tableName='master_heater_power')
-    if Verbosity >= 1: print(callStack, "Master H Power SQL: ", query)
+    logger.info("Master H Power SQL: %s", query)
     data = GetData(DBConn, 'MasterHeaterWatts.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax2)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  LIVING HEATER POWER  ----------")
+    logger.info("          ----------  LIVING HEATER POWER  ----------")
     query = makeQuery(timeField='time', dataName='Living', tableName='living_heater_power')
-    if Verbosity >= 1: print(callStack, "Living H Power SQL: ", query)
+    logger.info("Living H Power SQL: %s", query)
     data = GetData(DBConn, 'LivingHeaterWatts.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax2)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
     # ax2.legend()
     ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
-    callStack.pop()
+
 
 def ShowSSFurnace(DBConn):
-    global Verbosity, callStack, filePath
-    callStack.append('ShowSSFurnace')
+    global filePath
     ###############################  SS Furnace  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
     beginDate = BeginTime
@@ -698,7 +730,7 @@ def ShowSSFurnace(DBConn):
     ax1.set_title('Steamboat Furnace')
 
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  STEAMBOAT FURNACE ----------")
+    logger.info("          ----------  STEAMBOAT FURNACE ----------")
     query = "SELECT {timeField} AS 'Time', \
     round(json_value(message, '$.Temperature'), 1) AS 'Temp', \
     round(json_value(message, '$.Humidity'), 1) AS 'Humidity', \
@@ -710,20 +742,19 @@ def ShowSSFurnace(DBConn):
     AND json_value(message, '$.Temperature') < 150 \
     AND json_value(message, '$.Humidity') < 110 \
     ORDER BY {timeField}".format(timeField='RecTime', schema = myschema)
-    if Verbosity >= 1: print(callStack,' SQL query:\n', query)
+    logger.debug(' SQL query:\n%s', query)
     data = GetData(DBConn, 'SSFurnace.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
+        ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
+        plt.show()
+        plt.close(fig)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
-    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
-    plt.show()
-    plt.close(fig)
-    callStack.pop()
+        logger.warning("No data to plot for Steamboat Furnace")
 
 def ShowSSTemps(DBConn):
-    global Verbosity, callStack, filePath
-    callStack.append('ShowSSTemps')
+    global filePath
+
             # Supply default beginDate from CURRENT value of twoWeeksAgo
     beginDate = BeginTime
     ###############################  SS Temperatures  ##########################################
@@ -733,72 +764,72 @@ def ShowSSTemps(DBConn):
     ax1.set_title('Steamboat Temperatures')
     ax1.set_ylabel('°F')
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  OUTSIDE/INSIDE TEMPS ----------")
+    logger.info("          ----------  OUTSIDE/INSIDE TEMPS ----------")
     query = "SELECT {timeField} AS 'Time', \
     tempf AS 'Outside', \
     tempinf AS 'Hallway' \
     FROM `{schema}`.`weather` WHERE {timeField}  > '%s' \
     ORDER BY {timeField}".format(timeField='date', schema = myschema)
-    if Verbosity >= 1: print(callStack,' SQL query:\n', query)
+    logger.debug(' SQL query:\n%s', query)
     data = GetData(DBConn, 'SSWeatherTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  MASTER TEMP  ----------")
+    logger.info("          ----------  MASTER TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Master', tableName='master_temp', databaseName=myschema)
-    if Verbosity >= 1: print(callStack, "Master temp SQL: ", query)
+    logger.info("Master temp SQL: %s", query)
     data = GetData(DBConn, 'SSMasterTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  LIVING TEMP  ----------")
+    logger.info("          ----------  LIVING TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Living', tableName='living_temp', databaseName=myschema)
-    if Verbosity >= 1: print(callStack, "Living temp SQL: ", query)
+    logger.info("Living temp SQL: %s", query)
     data = GetData(DBConn, 'SSLivingTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  COMPUTER TEMP  ----------")
+    logger.info("          ----------  COMPUTER TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Computer', tableName='computer_temp', databaseName=myschema)
-    if Verbosity >= 1: print(callStack, "Computer temp SQL: ", query)
+    logger.info("Computer temp SQL: %s", query)
     data = GetData(DBConn, 'SSComputerTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  KITCHEN TEMP  ----------")
+    logger.info("          ----------  KITCHEN TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_temp', databaseName=myschema)
-    if Verbosity >= 1: print(callStack, "Kitchen temp SQL: ", query)
+    logger.info("Kitchen temp SQL: %s", query)
     data = GetData(DBConn, 'SSKitchenTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  MUD TEMP  ----------")
+    logger.info("          ----------  MUD TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Mud', tableName='mud_temp', databaseName=myschema)
-    if Verbosity >= 1: print(callStack, "Mud temp SQL: ", query)
+    logger.info("Mud temp SQL: %s", query)
     data = GetData(DBConn, 'SSMudTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
     ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
-    callStack.pop()
+
 
 def ShowSSHums(DBConn):
-    global Verbosity, callStack, filePath
-    callStack.append('ShowSSHums')
+    global filePath
+
             # Supply default beginDate from CURRENT value of twoWeeksAgo
     beginDate = BeginTime
     ###############################  SS Humidities    ##########################################
@@ -808,73 +839,73 @@ def ShowSSHums(DBConn):
     ax1.set_title('Steamboat Humidities')
     ax1.set_ylabel('% HUMIDITY')
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  OUTSIDE/INSIDE HUMIDITIES ----------")
+    logger.info("          ----------  OUTSIDE/INSIDE HUMIDITIES ----------")
     query = "SELECT {timeField} AS 'Time', \
     humidity AS 'Outside', \
     humidityin AS 'Hallway' \
     FROM `{schema}`.`weather` WHERE {timeField}  > '%s' \
     ORDER BY {timeField}".format(timeField='date', schema = myschema)
-    if Verbosity >= 1: print(callStack,' SQL query:\n', query)
+    logger.info(' SQL query:\n%s', query)
     data = GetData(DBConn, 'SSWeatherHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  MASTER HUMIDITY ----------")
+    logger.info("          ----------  MASTER HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Master', tableName='master_hum', databaseName=myschema)
-    if Verbosity >= 1: print(callStack, "Master Hum SQL: ", query)
+    logger.info("Master Hum SQL: %s", query)
     data = GetData(DBConn, 'SSMasterHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  LIVING HUMIDITY ----------")
+    logger.info("          ----------  LIVING HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Living', tableName='living_hum', databaseName=myschema)
-    if Verbosity >= 1: print(callStack, "Living Hum SQL: ", query)
+    logger.info("Living Hum SQL: %s", query)
     data = GetData(DBConn, 'SSLivingHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  COMPUTER HUMIDITY ----------")
+    logger.info("          ----------  COMPUTER HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Computer', tableName='computer_hum', databaseName=myschema)
-    if Verbosity >= 1: print(callStack, "Computer Hum SQL: ", query)
+    logger.info("Computer Hum SQL: %s", query)
     data = GetData(DBConn, 'SSComputerHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  KITCHEN HUMIDITY ----------")
+    logger.info("          ----------  KITCHEN HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_hum', databaseName=myschema)
-    if Verbosity >= 1: print(callStack, "Kitchen Hum SQL: ", query)
+    logger.info("Kitchen Hum SQL: %s", query)
     data = GetData(DBConn, 'SSKitchenHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
-    if Verbosity >= 1: print("\n", callStack, "          ----------  MUD HUMIDITY ----------")
+    logger.info("          ----------  MUD HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Mud', tableName='mud_hum', databaseName=myschema)
-    if Verbosity >= 1: print(callStack, "Mud Hum SQL: ", query)
+    logger.info("Mud Hum SQL: %s", query)
     data = GetData(DBConn, 'SSMudHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
-        if Verbosity >= 1: print(callStack, "No data to plot")
+        logger.info("No data to plot")
 
     ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
     plt.show()
     plt.close(fig)
-    callStack.pop()
+
 
 def main():
-    global Verbosity, callStack, filePath, ServerTimeFromUTC, twoWeeksAgo, ServerTimeFromUTCSec, DelOldCsv, haschema, myschema
+    global filePath, ServerTimeFromUTC, twoWeeksAgo, ServerTimeFromUTCSec, DelOldCsv, haschema, myschema
     global BeginTime
-    callStack.append('main')
+
     RCGraphs = {'solar', 'laundry', 'hums', 'temps', 'water', 'power', 'heaters'}
     SSGraphs = {'Furnace', 'Temps', 'Hums'}
     parser = argparse.ArgumentParser(description = 'Display graphs of home parameters.\nDefaults to show all.')
@@ -896,42 +927,62 @@ def main():
     DelOldCsv = args.DeleteOld
     numDays = float(args.days)
 
-    command_line_args = {k for k, v in vars(args).items() if v}
-    command_line_args.discard('verbosity')      # verbosity not a plotting item
-    command_line_args.discard('DeleteOldCSVData')      # DeleteOldCSVData not a plotting item
-    command_line_args.discard('days')      # number of days is not a plotting item
-
-    if len(command_line_args) == 0:     # no options given, provide a default set.
-        command_line_args = SSGraphs.union(RCGraphs)        # all graphs
-    if Verbosity >= 1:         print(callStack, command_line_args)
-    if Verbosity >= 3:         print(callStack, 'Command line contains RC graphs: ', not RCGraphs.isdisjoint(command_line_args))
-    if Verbosity >= 3:         print(callStack, 'Command line contains SS graphs: ', not SSGraphs.isdisjoint(command_line_args))
+    desired_plots = {k for k, v in vars(args).items() if v}
+    desired_plots.discard('verbosity')      # verbosity not a plotting item
+    desired_plots.discard('DeleteOldCSVData')      # DeleteOldCSVData not a plotting item
+    desired_plots.discard('days')      # number of days is not a plotting item
 
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
-    config.read('secrets.ini')
-    cfgSection = os.environ['HOST']+"/"+os.path.basename(sys.argv[0])
-    if Verbosity >= 2: print(callStack, "INI file cofig section is:", cfgSection)
+    configFile = GetConfigFilePath()
+
+    config.read(configFile)
+    cfgSection = os.path.basename(sys.argv[0])+"/"+os.environ['HOST']
+    logger.info("INI file cofig section is: %s", cfgSection)
+    if not config.has_section(cfgSection):
+        logger.critical('Config file "%s", has no section "%s".', configFile, cfgSection)
+        sys.exit(2)
+    if set(config.options(cfgSection)) < RequiredConfigParams:
+        logger.critical('Config  section "%s" does not have all required params: "%s", it has params: "%s".', cfgSection, RequiredConfigParams, set(config.options(cfgSection)))
+        sys.exit(3)
+
     cfg = config[cfgSection]
 
-    if  not RCGraphs.isdisjoint(command_line_args):
+    configGraphs = []
+    if config.has_option(cfgSection, 'default_rc_graphs'):
+        configGraphs.extend(cfg['default_rc_graphs'].split())
+        logger.debug('configGraphs for rc is %s', configGraphs)
+    if config.has_option(cfgSection, 'default_ss_graphs'):
+        configGraphs.extend(cfg['default_ss_graphs'].split())
+        logger.debug('configGraphs for rc and ss is %s', configGraphs)
+    if len(desired_plots) == 0 and len(configGraphs) > 0:     # no options given, provide a default set from config.
+        desired_plots = set(configGraphs)        # config graphs
+
+    if len(desired_plots) == 0:     # no options given, and no config graphs, provide a default set.
+        desired_plots = SSGraphs.union(RCGraphs)        # all graphs
+        logger.debug('No plots specified on command lind or config file; plot all known.')
+    logger.info('Desired plots set is: %s', desired_plots)
+    logger.info('Command line contains RC graphs: %s', not RCGraphs.isdisjoint(desired_plots))
+    logger.info('Command line contains SS graphs: %s', not SSGraphs.isdisjoint(desired_plots))
+
+
+    if  not RCGraphs.isdisjoint(desired_plots):
         user = cfg['database_reader_user']
         pwd  = cfg['database_reader_password']
         host = cfg['rc_database_host']
         port = cfg['rc_database_port']
         haschema = cfg['rc_ha_schema']
         myschema = cfg['rc_my_schema']
-        if Verbosity >= 2:
-            print(callStack, "RC user", user)
-            print(callStack, "RC pwd", pwd)
-            print(callStack, "RC host", host)
-            print(callStack, "RC port", port)
-            print(callStack, "RC haschema", haschema)
-            print(callStack, "RC myschema", myschema)
+        logger.info("RC user %s", user)
+        logger.info("RC pwd %s", pwd)
+        logger.info("RC host %s", host)
+        logger.info("RC port %s", port)
+        logger.info("RC haschema %s", haschema)
+        logger.info("RC myschema %s", myschema)
 
         connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=haschema)
-        if Verbosity >= 1: print(callStack, "RC database connection string:", connstr)
-        Eng = create_engine(connstr, echo = True if Verbosity>=2 else False)
-        if Verbosity >= 1: print(callStack, Eng)
+        logger.debug("RC database connection string: %s", connstr)
+        Eng = create_engine(connstr, echo = True if Verbosity>=2 else False, logging_name = logger.name)
+        logger.debug(Eng)
         with Eng.connect() as conn, conn.begin():
             result = conn.execute("select timestampdiff(hour, utc_timestamp(), now());")
             for row in result:
@@ -939,37 +990,35 @@ def main():
                 ServerTimeFromUTCSec = ServerTimeFromUTC.days*86400+ServerTimeFromUTC.seconds
             twoWeeksAgo = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=14))
             BeginTime = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
-            if Verbosity >= 1:
-                print(callStack, "RC Server time offset from UTC: ", ServerTimeFromUTC)
-                print(callStack, "RC Server time offset from UTC (seconds): ", ServerTimeFromUTCSec)
-                print(callStack, "RC twoWeeksAgo: ", twoWeeksAgo)
-            if 'laundry'    in command_line_args:   ShowRCLaundry(conn)
-            if 'solar'      in command_line_args:   ShowRCSolar(conn)
-            if 'temps'      in command_line_args:   ShowRCTemps(conn)
-            if 'hums'       in command_line_args:   ShowRCHums(conn)
-            if 'heaters'    in command_line_args:   ShowRCHeaters(conn)
-            if 'water'      in command_line_args:   ShowRCWater(conn)
-            if 'power'      in command_line_args:   ShowRCPower(conn)
+            logger.debug("RC Server time offset from UTC: %s", ServerTimeFromUTC)
+            logger.debug("RC Server time offset from UTC (seconds): %s", ServerTimeFromUTCSec)
+            logger.debug("RC twoWeeksAgo: %s", twoWeeksAgo)
+            if 'laundry'    in desired_plots:   ShowRCLaundry(conn)
+            if 'solar'      in desired_plots:   ShowRCSolar(conn)
+            if 'temps'      in desired_plots:   ShowRCTemps(conn)
+            if 'hums'       in desired_plots:   ShowRCHums(conn)
+            if 'heaters'    in desired_plots:   ShowRCHeaters(conn)
+            if 'water'      in desired_plots:   ShowRCWater(conn)
+            if 'power'      in desired_plots:   ShowRCPower(conn)
 
-    if  not SSGraphs.isdisjoint(command_line_args):
+    if  not SSGraphs.isdisjoint(desired_plots):
         user = cfg['database_reader_user']
         pwd  = cfg['database_reader_password']
         host = cfg['ss_database_host']
         port = cfg['ss_database_port']
         haschema = cfg['ss_ha_schema']
         myschema = cfg['ss_my_schema']
-        if Verbosity >= 2:
-            print(callStack, "SS user", user)
-            print(callStack, "SS pwd", pwd)
-            print(callStack, "SS host", host)
-            print(callStack, "SS port", port)
-            print(callStack, "SS haschema", haschema)
-            print(callStack, "SS myschema", myschema)
+        logger.info("SS user %s", user)
+        logger.info("SS pwd %s", pwd)
+        logger.info("SS host %s", host)
+        logger.info("SS port %s", port)
+        logger.info("SS haschema %s", haschema)
+        logger.info("SS myschema %s", myschema)
 
         connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=haschema)
-        if Verbosity >= 1: print(callStack, "SS database connection string:", connstr)
-        Eng = create_engine(connstr, echo = True if Verbosity>=2 else False)
-        if Verbosity >= 1: print(callStack, Eng)
+        logger.debug("SS database connection string: %s", connstr)
+        Eng = create_engine(connstr, echo = True if Verbosity>=2 else False, logging_name = logger.name)
+        logger.debug(Eng)
         with Eng.connect() as conn, conn.begin():
             result = conn.execute("select timestampdiff(hour, utc_timestamp(), now());")
             for row in result:
@@ -977,15 +1026,14 @@ def main():
                 ServerTimeFromUTCSec = ServerTimeFromUTC.days*86400+ServerTimeFromUTC.seconds
             twoWeeksAgo = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=14))
             BeginTime = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
-            if Verbosity >= 1:
-                print(callStack, "SS Server time offset from UTC: ", ServerTimeFromUTC)
-                print(callStack, "SS Server time offset from UTC (seconds): ", ServerTimeFromUTCSec)
-                print(callStack, "SS twoWeeksAgo: ", twoWeeksAgo)
-            if 'Furnace' in command_line_args:      ShowSSFurnace(conn)
-            if 'Temps' in command_line_args:        ShowSSTemps(conn)
-            if 'Hums' in command_line_args:         ShowSSHums(conn)
+            logger.debug("SS Server time offset from UTC: %s", ServerTimeFromUTC)
+            logger.debug("SS Server time offset from UTC (seconds): %s", ServerTimeFromUTCSec)
+            logger.debug("SS twoWeeksAgo: %s", twoWeeksAgo)
+            if 'Furnace' in desired_plots:      ShowSSFurnace(conn)
+            if 'Temps' in desired_plots:        ShowSSTemps(conn)
+            if 'Hums' in desired_plots:         ShowSSHums(conn)
 
-    callStack.pop()
+
 
 if __name__ == "__main__":
     main()

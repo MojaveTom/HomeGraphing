@@ -24,20 +24,46 @@ import argparse
 import sys
 import time
 import configparser
-
-from ambient_api import ambientapi
+import logging
+import logging.config
+import logging.handlers
 import json
 
+ProgName, ext = os.path.splitext(os.path.basename(sys.argv[0]))
+ProgPath = os.path.dirname(sys.argv[0])
+logConfFileName = os.path.join(ProgPath, ProgName + '_loggingconf.json')
+if os.path.isfile(logConfFileName):
+    try:
+        with open(logConfFileName, 'r') as logging_configuration_file:
+            config_dict = json.load(logging_configuration_file)
+        logging.config.dictConfig(config_dict)
+    except:
+        print("loading logger config from file failed.")
+        pass
+
+logger = logging.getLogger(__name__)
+logger.info('logger name is: "%s"', logger.name)
+logging.getLogger('matplotlib.axes._base').setLevel('WARNING')      # turn off matplotlib info & debug messages
+logging.getLogger('matplotlib.font_manager').setLevel('WARNING')
+
+def GetConfigFilePath():
+    fp = os.path.join(ProgPath, 'secrets.ini')
+    if not os.path.isfile(fp):
+        fp = os.environ['PrivateConfig']
+        if not os.path.isfile(fp):
+            logger.error('No configuration file found.')
+            sys.exit(1)
+    logger.info('Using configuration file at: %s', fp)
+    return fp
+    
+from ambient_api import ambientapi
+
 #######################   GLOBALS   ########################
-Verbosity = 0
-callStack = []
 ServerTimeFromUTC = timedelta(hours=0)
-ServerTimeFromUTCSec = 0
+RequiredConfigParams = frozenset(('ambient_endpoint', 'ambient_api_key', 'ambient_application_key', 'inserter_host', 'inserter_schema', 'inserter_port', 'inserter_user', 'inserter_password', 'weather_table'))
 
 def main():
-    global Verbosity, callStack, ServerTimeFromUTC, ServerTimeFromUTCSec
-    callStack.append('main')
-    if Verbosity>= 1: print(callStack, "Entered main.", flush=True)
+    logger.debug("Entered main.")
     parser = argparse.ArgumentParser(
         description='Retrieve weather data from Ambient.net.')
     parser.add_argument("-o", "--oldData", dest="desiredFirst", action="store", help="Set desired first database date.")
@@ -49,62 +75,58 @@ def main():
     if args.desiredFirst is not None:
         try:
             firstDate = datetime.fromisoformat(args.desiredFirst)
-            if Verbosity >= 1:
-                print(callStack, "Desired first date is: ", str(firstDate))
-        except:
-            if Verbosity >= 0:
-                print(callStack, "Old data retrieval aborted because given time was ill-formatted.")
-            if Verbosity >= 1:
-                print(callStack, "--oldData time was specified as: ", args.desiredFirst)
+            logger.info("Desired first date is: %s", str(firstDate))
+        except Exception as e:
+            logger.error("Old data retrieval aborted because given time was ill-formatted.")
+            logger.info("--oldData time was specified as: %s", args.desiredFirst)
+            logger.exception(e)
     else:
-        if Verbosity >= 1:
-            print(callStack, "No historical weather data desired.")
+        logger.info("No historical weather data desired.")
 
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
-    config.read('secrets.ini')
-    cfgSection = os.path.basename(sys.argv[0])
-    if Verbosity >= 2: print(callStack, "INI file cofig section is:", cfgSection)
+    configFile = GetConfigFilePath()
+
+    config.read(configFile)
+    cfgSection = os.path.basename(sys.argv[0])+"/"+os.environ['HOST']
+    logger.info("INI file cofig section is: %s", cfgSection)
+    if not config.has_section(cfgSection):
+        logger.critical('Config file "%s", has no section "%s".', configFile, cfgSection)
+        sys.exit(2)
+    if set(config.options(cfgSection)) < RequiredConfigParams:
+        logger.critical('Config  section "%s" does not have all required params: "%s", it has params: "%s".', cfgSection, RequiredConfigParams, set(config.options(cfgSection)))
+        sys.exit(3)
+
     cfg = config[cfgSection]
 
-    user = cfg['ss_inserter_user']
-    pwd  = cfg['ss_inserter_password']
-    host = cfg['ss_inserter_host']
-    port = cfg['ss_inserter_port']
-    myschema = cfg['ss_inserter_schema']
+    user = cfg['inserter_user']
+    pwd  = cfg['inserter_password']
+    host = cfg['inserter_host']
+    port = cfg['inserter_port']
+    myschema = cfg['inserter_schema']
     endpoint = cfg['ambient_endpoint']
     api_key = cfg['ambient_api_key']
     app_key = cfg['ambient_application_key']
+    weather_table = cfg['weather_table']
 
     connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=myschema)
-    if Verbosity >= 1: print(callStack, "SS weather database connection string:", connstr)
-    InserterEng = create_engine(connstr, echo = True if Verbosity>=2 else False)
-    if Verbosity >= 1:
-        print(callStack, InserterEng, flush=True)
+    logger.info("SS weather database connection string: %s", connstr)
+    InserterEng = create_engine(connstr, echo = True if Verbosity>=1 else False, logging_name = logger.name)
+    logger.info(InserterEng)
     with InserterEng.connect() as Iconn, Iconn.begin():
-        if Verbosity >= 1:
-            print(callStack, "Insertion connection to database established.", flush=True)
-        result = Iconn.execute("SELECT timestampdiff(hour, utc_timestamp(), now());")
-        for row in result:
-            ServerTimeFromUTC = timedelta(hours=row[0])
-            ServerTimeFromUTCSec = ServerTimeFromUTC.days*86400+ServerTimeFromUTC.seconds
-        if Verbosity >= 1:
-            print(callStack, "SS Server time offset from UTC: ", ServerTimeFromUTC, flush=True)
-            print(callStack, "SS Server time offset from UTC (seconds): ",
-                ServerTimeFromUTCSec, flush=True)
+        logger.info("Insertion connection to database established.")
         Ambient_api = ambientapi.AmbientAPI(AMBIENT_ENDPOINT=endpoint \
             , AMBIENT_API_KEY=api_key \
             # log_levels are: debug, info, warning, error, critical, console (just prints message)
             # log_file is ignored if log_level is 'console'
             , AMBIENT_APPLICATION_KEY=app_key \
-            , log_level='console' if Verbosity >= 2 else None \
-            # , log_file='ambient.log' \
+            , log_level='console' if Verbosity >= 1 else None \
+            , log_file='ambient.log' if Verbosity >= 1 else None \
             )
 
         device = Ambient_api.get_devices()[0]
-        if Verbosity >= 1:
-            print(callStack, "Weather station info: ", device.info, flush=True)
-            print(callStack, "MAC address of weather station: ", device.mac_address, flush=True)
-        result = Iconn.execute("SELECT date FROM weather ORDER BY date DESC LIMIT 2")
+        logger.debug("Weather station info: %s", device.info)
+        logger.debug("MAC address of weather station: %s", device.mac_address)
+        result = Iconn.execute("SELECT date FROM `"+myschema+"`.`"+weather_table+"` ORDER BY date DESC LIMIT 2")
         lastTimeInDb = None
         nextToLastTime = None
         for r in result:
@@ -112,92 +134,92 @@ def main():
             elif nextToLastTime is None:
                 nextToLastTime = r[0]
                 break
-        result = Iconn.execute("SELECT date FROM weather ORDER BY date LIMIT 1")
+        logger.debug('lastTimeInDb: %s, nextToLastTime: %s', lastTimeInDb, nextToLastTime)
+        result = Iconn.execute("SELECT date FROM `"+myschema+"`.`"+weather_table+"` ORDER BY date LIMIT 1")
         firstTimeInDb = None
         for r in result:
             firstTimeInDb = r[0]
-        timeDiff = lastTimeInDb - nextToLastTime
+        logger.debug('firstTimeInDb: %s', firstTimeInDb)
+        if lastTimeInDb and nextToLastTime:
+            timeDiff = lastTimeInDb - nextToLastTime
+        else:
+            timeDiff = timedelta(minutes=5)
         nowTime = datetime.now()
-        numNew = int((nowTime - lastTimeInDb) / timeDiff)
-        if Verbosity >= 2:
-            print(callStack, "lastTimeInDb: ", lastTimeInDb, "; nextToLastTime: ", nextToLastTime, "; timeDiff: ", timeDiff)
-            print(callStack, "nowTime: ", nowTime)
-        if Verbosity >= 1:
-            print(callStack, "Number of new data points is: ", numNew)
+        if lastTimeInDb:
+            numNew = int((nowTime - lastTimeInDb) / timeDiff)
+        else:
+            numNew = 288
+        logger.info("lastTimeInDb: %s; nextToLastTime: %s; timeDiff: %s", lastTimeInDb, nextToLastTime, timeDiff)
+        logger.info("nowTime: %s", nowTime)
+        logger.info("Number of new data points is: %s", numNew)
 
         tzsavesql = "SET @oldtz=@@session.time_zone"
         tzsetUTC  = "SET @@session.time_zone='+00:00'"
         tzrestoresql = "SET @@session.time_zone=@oldtz"
+        logger.debug('tzsavesql: %s', tzsavesql)
+        logger.debug('tzsetUTC: %s', tzsetUTC)
+        logger.debug('tzrestoresql: %s', tzrestoresql)
         try:
             result = Iconn.execute(tzsavesql)
             result = Iconn.execute(tzsetUTC)
         except exc.DBAPIError as e:
             _ = e
-            print("Caught DBAPIError exception settinmg time_zone: ", e)
+            logger.error("Caught DBAPIError exception settinmg time_zone: %s", e)
+            logger.exception(e)
             pass
 
         time.sleep(2)       # Wait a while for Ambient server to recover: at least 1 sec.
 
         wdata = device.get_data(limit=numNew+2)     # Get a couple duplicates "just in case"
         if len(wdata) > 0:
-            if Verbosity >= 1:
-                print(callStack, "Length, type of weather device data:", len(wdata), type(wdata), type(wdata[0]), flush=True)
-            if Verbosity >= 2:
-                print(callStack, "Weather device data:", wdata, flush=True)
+            logger.debug("Length, type of weather device data: %s, %s, %s", len(wdata), type(wdata), type(wdata[0]))
+            logger.info("Weather device data: %s", wdata)
             for dp in wdata:
-                insertsql = "INSERT IGNORE INTO `"+myschema+"`.`weather` "+str(tuple(dp.keys())).replace("'", "") \
+                insertsql = "INSERT IGNORE INTO `"+myschema+"`.`"+weather_table+"` "+str(tuple(dp.keys())).replace("'", "") \
                     +" VALUES "+str(tuple(dp.values())).replace("Z","")+" ON DUPLICATE KEY UPDATE date = VALUES(date)"
-                if Verbosity >= 3:
-                    print(callStack, "Insert SQL: ", insertsql, flush=True)
+                logger.debug("Insert SQL: %s", insertsql)
                 try:
                     Iconn.execute(insertsql)
                 except exc.DBAPIError as e:
                     _ = e
-                    print("Caught DBAPIError exception inserting data: ", e)
+                    logger.warning("Caught DBAPIError exception inserting data: %s", e)
+                    logger.exception(e)
                     pass
         else:
-            print(callStack, "No new weather data retrieved.")
+            logger.info("No new weather data retrieved.")
 
-        if (Verbosity >= 1) and (firstDate is not None) and (firstTimeInDb is not None) and (firstDate >= firstTimeInDb):
-            print(callStack, "Database already has desired historical data.")
+        if (firstDate is not None) and (firstTimeInDb is not None) and (firstDate >= firstTimeInDb):
+            logger.info("Database already has desired historical data.")
         elif (firstDate is not None) and (firstTimeInDb is not None) and (firstDate < firstTimeInDb):
-            if Verbosity >= 1:
-                print(callStack, "Trying to retrieve historical weather data before: ", firstTimeInDb, " back to: ", firstDate)
+            logger.info("Trying to retrieve historical weather data before: %s back to: %s", firstTimeInDb, firstDate)
             time.sleep(2)       # wait for ambient serv er to recover
             wdata = device.get_data(end_date = firstTimeInDb)
             if len(wdata) > 0:
-                if Verbosity >= 1:
-                    print(callStack, "Length, type of weather device data:", len(wdata), type(wdata), type(wdata[0]), flush=True)
-                if Verbosity >= 2:
-                    print(callStack, "Weather device data:", wdata, flush=True)
+                logger.debug("Length, type of weather device data: %s, %s, %s", len(wdata), type(wdata), type(wdata[0]))
+                logger.info("Weather device data: %s", wdata)
                 for dp in wdata:
-                    insertsql = "INSERT IGNORE INTO `"+myschema+"`.`weather` " \
+                    insertsql = "INSERT IGNORE INTO `"+myschema+"`.`"+weather_table+"` " \
                             + str(tuple(dp.keys())).replace("'", "") \
                             + " VALUES " \
                             + str(tuple(dp.values())).replace("Z","") \
                             + " ON DUPLICATE KEY UPDATE date = VALUES(date)"
-                    if Verbosity >= 3:
-                        print(callStack, "Insert SQL: ", insertsql, flush=True)
+                    logger.debug("Insert SQL: %s", insertsql)
                     try:
                         Iconn.execute(insertsql)
                     except exc.DBAPIError as e:
                         _ = e
-                        print("Caught DBAPIError exception inserting data: ", e)
-                        pass
+                        logger.warning("Caught DBAPIError exception inserting data: %s", e)
+                        logger.exception(e)
             else:
-                if Verbosity >= 0:
-                    print(callStack, "No historical data retrieved.")
+                logger.info("No historical data retrieved.")
 
         try:
             result = Iconn.execute(tzrestoresql)
         except exc.DBAPIError as e:
             _ = e
-            print("Caught DBAPIError exception restoring time zone: ", e)
+            logger.warning("Caught DBAPIError exception inserting data: %s", e)
+            logger.exception(e)
             pass
-
-
-    callStack.pop()
-
 
 if __name__ == "__main__":
     main()

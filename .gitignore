@@ -38,6 +38,9 @@ Thumbs.db
 # configuration files not to be shared.
 secret*.ini
 
+# ignore various log files
+*.log*
+
 # qtcreator generated files
 *.pro.user*
 

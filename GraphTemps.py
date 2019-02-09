@@ -21,7 +21,7 @@ import logging.handlers
 import json
 
 ProgName, ext = os.path.splitext(os.path.basename(sys.argv[0]))
-ProgPath = os.path.dirname(sys.argv[0])
+ProgPath = os.path.dirname(os.path.realpath(sys.argv[0]))
 logConfFileName = os.path.join(ProgPath, ProgName + '_loggingconf.json')
 if os.path.isfile(logConfFileName):
     try:
@@ -34,7 +34,8 @@ if os.path.isfile(logConfFileName):
             logPath=""
         for p in config_dict['handlers'].keys():
             if 'filename' in config_dict['handlers'][p]:
-                config_dict['handlers'][p]['filename'] = os.path.join(logPath, config_dict['handlers'][p]['filename'])
+                logFileName = os.path.join(logPath, config_dict['handlers'][p]['filename'])
+                config_dict['handlers'][p]['filename'] = logFileName
         logging.config.dictConfig(config_dict)
     except Exception as e:
         print("loading logger config from file failed.")

@@ -141,8 +141,6 @@ def GetData(fileName, DBConn = None, query = None):
     dataTimeOffsetUTC = ServerTimeFromUTC
 
     logger.debug('call args beginDate = %s dataTimeOffsetUTC = %s', beginDate, dataTimeOffsetUTC)
-    slicer = 'index > "%s"'%(beginDate + dataTimeOffsetUTC).isoformat()     # pandas "query" to remove old data FROM csv data
-    logger.info('slicer = %s', slicer)
     theFile = os.path.join(filePath, fileName)
     logger.info('theFile: %s', theFile)
     CSVdataRead = False     # flag is true if we read csv data
@@ -153,7 +151,11 @@ def GetData(fileName, DBConn = None, query = None):
         else:
             fdata = pd.read_csv(theFile, index_col=0, parse_dates=True)
             logger.debug('Num Points from CSV = %s', fdata.size)
-            if (fdata.size > 0) and (fdata.index[0] <= beginDate):
+            if (fdata.size <= 0):
+                logger.info("CSV file exists but has no data.") 
+            elif (beginDate is not None) and (fdata.index[0] > beginDate):
+                logger.debug("CSV data all more recent than desired data; ignore it.")
+            else:
                 beginDate = fdata.index[-1]
                 logger.debug('Last CSV time = new beginDate = %s', beginDate)
                 logger.debug('CSVdata tail:\n%s', fdata.tail())
@@ -161,16 +163,9 @@ def GetData(fileName, DBConn = None, query = None):
                 logger.debug('CSVdata columns:\n%s', fdata.columns)
                 logger.debug('CSVdata index:\n%s', fdata.index)
                 CSVdataRead = True
-            elif (fdata.size <= 0):
-                logger.info("CSV file exists but has no data.") 
-            elif (fdata.size > 0) and (fdata.index[0] > beginDate):
-                logger.debug("CSV data all more recent than desired data; ignore it.")
-            else:
-                pass
     else:
         logger.debug('CSV file does not exist.')
         pass
-    beginDate = beginDate - ServerTimeFromUTC + dataTimeOffsetUTC
     logger.debug('beginDate after CSV modified for SQL = %s', beginDate)
     logger.debug("Comparing: now UTC time: %s and UTC data time: %s", datetime.utcnow(), (beginDate - dataTimeOffsetUTC))
     if (not CSVdataRead) or (datetime.utcnow() - beginDate + dataTimeOffsetUTC) > timedelta(minutes=20) and DBConn and query:
@@ -216,15 +211,10 @@ def GetData(fileName, DBConn = None, query = None):
         pass
 
     # Only save two weeks of data in the CSV file
-    data.query('index > "%s"'%(twoWeeksAgo + dataTimeOffsetUTC).isoformat()).to_csv(theFile, index='Time')
+    data.query('index > "%s"'% twoWeeksAgo.isoformat()).to_csv(theFile, index='Time')
 
-    # in "context" of calling function
-    logger.debug('head:\n%s', data.head())
-    logger.debug('tail:\n%s', data.tail())
-    logger.debug('dtypes:\n%s', data.dtypes)
-    logger.debug('columns:\n%s', data.columns)
-    logger.debug('index:\n%s', data.index)
-
+    slicer = 'index > "%s"'%(beginDate + dataTimeOffsetUTC).isoformat()     # pandas "query" to remove old data FROM csv data
+    logger.info('slicer = %s', slicer)
     return data.query(slicer)       # return data from beginDate to  present
 
 def ShowRCPower(DBConn):
@@ -232,7 +222,6 @@ def ShowRCPower(DBConn):
 
     ###############################  POWER  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
     ax1.set_xlabel('Date/time')
@@ -305,7 +294,6 @@ def ShowRCLaundry(DBConn):
     #############    Laundry Trap    #########
 
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     fig = plt.figure(figsize=[15, 5])   #  Define a figure and set its size in inches.
     ax1 = fig.add_subplot(1, 1, 1)      #  Get reference to axes for labeling
     ax1.set_ylabel('°F')
@@ -349,7 +337,6 @@ def ShowRCSolar(DBConn):
 
     ###############################  Solar Energy  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     #  Setup the figure with two y axes
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -405,7 +392,6 @@ def ShowRCWater(DBConn):
 
     ###############################  Water  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     #  Setup the figure with two y axes
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -453,7 +439,6 @@ def ShowRCTemps(DBConn):
     global filePath
 
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     ###############################  Temperatures  ############################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -534,8 +519,6 @@ def ShowRCTemps(DBConn):
 def ShowRCHums(DBConn):
     global filePath
 
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     ###############################  Humidities  ############################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -616,8 +599,6 @@ def ShowRCHums(DBConn):
 def ShowRCHeaters(DBConn):
     global filePath
 
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     ###############################  HEATERS  ############################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -747,8 +728,6 @@ def ShowRCHeaters(DBConn):
 def ShowSSFurnace(DBConn):
     global filePath
     ###############################  SS Furnace  ############################################
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     fig = plt.figure(figsize=[15, 5])   #  Define a figure and set its size in inches.
     ax1 = fig.add_subplot(1, 1, 1)      #  Get reference to axes for labeling
   # ax1.set_ylabel('°F')
@@ -780,9 +759,6 @@ def ShowSSFurnace(DBConn):
 
 def ShowSSTemps(DBConn):
     global filePath
-
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     ###############################  SS Temperatures  ##########################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -855,9 +831,6 @@ def ShowSSTemps(DBConn):
 
 def ShowSSHums(DBConn):
     global filePath
-
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     ###############################  SS Humidities    ##########################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -955,7 +928,7 @@ def main():
 
     desired_plots = {k for k, v in vars(args).items() if v}
     desired_plots.discard('verbosity')      # verbosity not a plotting item
-    desired_plots.discard('DeleteOldCSVData')      # DeleteOldCSVData not a plotting item
+    desired_plots.discard('DeleteOld')      # DeleteOldCSVData not a plotting item
     desired_plots.discard('days')      # number of days is not a plotting item
 
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())

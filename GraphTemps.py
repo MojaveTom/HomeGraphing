@@ -76,6 +76,7 @@ def GetConfigFilePath():
 
 #  global twoWeeksAgo, filePath
 DelOldCsv = False
+SaveCSVData = True  # Flags GetData function to save back to the CSV data file.
 twoWeeksAgo = (datetime.today() - timedelta(days=14))
 filePath = os.path.abspath(os.path.join(os.environ['HOME'], 'GraphingData'))
 ServerTimeFromUTC = timedelta(hours=0)
@@ -221,7 +222,7 @@ def GetData(fileName, DBConn = None, query = None):
         pass
 
     # Only save two weeks of data in the CSV file
-    data.query('index > "%s"'% twoWeeksAgo.isoformat()).to_csv(theFile, index='Time')
+    if SaveCSVData: data.query('index > "%s"'% twoWeeksAgo.isoformat()).to_csv(theFile, index='Time')
 
     slicer = 'index > "%s"'%(beginDate + dataTimeOffsetUTC).isoformat()     # pandas "query" to remove old data FROM csv data
     logger.info('slicer = %s', slicer)
@@ -931,14 +932,17 @@ def main():
     parser.add_argument("-T", "--SSTemperatures", dest="Temps", action="store_true", help="Show Steamboat Temperatures graph.")
     parser.add_argument("-v", "--verbosity", dest="verbosity", action="count", help="increase output verbosity", default=0)
     parser.add_argument("--DeleteOldCSVData", dest="DeleteOld", action="store_true", help="Delete any existing CSV data for selected graphs before retrieving new.")
+    parser.add_argument("--DontSaveCSVData", dest="DontSaveCSVdata", action="store_true", default=False, help="Do NOT save CSV data for selected graphs.")
     args = parser.parse_args()
     Verbosity = args.verbosity
     DelOldCsv = args.DeleteOld
+    SaveCSVData = not args.DontSaveCSVdata
     numDays = float(args.days)
 
     desired_plots = {k for k, v in vars(args).items() if v}
     desired_plots.discard('verbosity')      # verbosity not a plotting item
     desired_plots.discard('DeleteOld')      # DeleteOldCSVData not a plotting item
+    desired_plots.discard('DontSaveCSVdata')      # DontSaveCSVdata not a plotting item
     desired_plots.discard('days')      # number of days is not a plotting item
 
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())

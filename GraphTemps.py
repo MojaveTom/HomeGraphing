@@ -149,6 +149,7 @@ def GetData(fileName, DBConn = None, query = None):
     global filePath
     # Pick up local variables from globals
     beginDate = BeginTime
+    SQLbeginDate = beginDate
     dataTimeOffsetUTC = ServerTimeFromUTC
 
     logger.debug('call args -- fileName: %s, DBConn: %s, query: %s', fileName, DBConn, query)
@@ -168,7 +169,7 @@ def GetData(fileName, DBConn = None, query = None):
             elif (beginDate is not None) and (fdata.index[0] > beginDate):
                 logger.debug("CSV data all more recent than desired data; ignore it.")
             else:
-                beginDate = fdata.index[-1]
+                SQLbeginDate = fdata.index[-1]
                 logger.debug('Last CSV time = new beginDate = %s', beginDate)
                 logger.debug('CSVdata tail:\n%s', fdata.tail())
                 logger.debug('CSVdata dtypes:\n%s', fdata.dtypes)
@@ -178,11 +179,11 @@ def GetData(fileName, DBConn = None, query = None):
     else:
         logger.debug('CSV file does not exist.')
         pass
-    logger.debug('beginDate after CSV modified for SQL = %s', beginDate)
-    logger.debug("Comparing: now UTC time: %s and UTC data time: %s", datetime.utcnow(), (beginDate - dataTimeOffsetUTC))
-    if (not CSVdataRead) or (datetime.utcnow() - beginDate + dataTimeOffsetUTC) > timedelta(minutes=20) and DBConn and query:
-        logger.debug('beginDate for creating SQL query %s', beginDate)
-        myQuery = query%beginDate.isoformat()
+    logger.debug('SQLbeginDate after CSV modified for SQL = %s', SQLbeginDate)
+    logger.debug("Comparing: now UTC time: %s and UTC data time: %s", datetime.utcnow(), (SQLbeginDate - dataTimeOffsetUTC))
+    if (not CSVdataRead) or (datetime.utcnow() - SQLbeginDate + dataTimeOffsetUTC) > timedelta(minutes=20) and DBConn and query:
+        logger.debug('SQLbeginDate for creating SQL query %s', SQLbeginDate)
+        myQuery = query%SQLbeginDate.isoformat()
         logger.info('SQL query: %s', myQuery)
         data = pd.read_sql_query(myQuery, DBConn, index_col='Time')
         if data.index.size != 0:
@@ -217,7 +218,7 @@ def GetData(fileName, DBConn = None, query = None):
     else:
         if DBConn and query:
             logger.info("CSV data is recent enough; don't query database. ")
-            logger.debug("now %s beginDate %s diff %s", datetime.utcnow(), beginDate, (datetime.utcnow() - beginDate))
+            logger.debug("now %s SQLbeginDate %s diff %s", datetime.utcnow(), SQLbeginDate, (datetime.utcnow() - SQLbeginDate))
         else:
             logger.debug('No database parameters defined; no SQL data.')
         data = fdata

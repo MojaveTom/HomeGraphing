@@ -58,7 +58,7 @@ def GetConfigFilePath():
     if not os.path.isfile(fp):
         fp = os.environ['PrivateConfig']
         if not os.path.isfile(fp):
-            logger.error('No configuration file found.')
+            logger.error('No configuration file found: %s', fp)
             sys.exit(1)
     logger.info('Using configuration file at: %s', fp)
     return fp

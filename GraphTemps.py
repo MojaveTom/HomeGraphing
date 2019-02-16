@@ -151,7 +151,8 @@ def GetData(fileName, DBConn = None, query = None):
     beginDate = BeginTime
     dataTimeOffsetUTC = ServerTimeFromUTC
 
-    logger.debug('call args beginDate = %s dataTimeOffsetUTC = %s', beginDate, dataTimeOffsetUTC)
+    logger.debug('call args -- fileName: %s, DBConn: %s, query: %s', fileName, DBConn, query)
+    logger.debug('beginDate = %s dataTimeOffsetUTC = %s', beginDate, dataTimeOffsetUTC)
     theFile = os.path.join(filePath, fileName)
     logger.info('theFile: %s', theFile)
     CSVdataRead = False     # flag is true if we read csv data
@@ -180,6 +181,7 @@ def GetData(fileName, DBConn = None, query = None):
     logger.debug('beginDate after CSV modified for SQL = %s', beginDate)
     logger.debug("Comparing: now UTC time: %s and UTC data time: %s", datetime.utcnow(), (beginDate - dataTimeOffsetUTC))
     if (not CSVdataRead) or (datetime.utcnow() - beginDate + dataTimeOffsetUTC) > timedelta(minutes=20) and DBConn and query:
+        logger.debug('beginDate for creating SQL query %s', beginDate)
         myQuery = query%beginDate.isoformat()
         logger.info('SQL query: %s', myQuery)
         data = pd.read_sql_query(myQuery, DBConn, index_col='Time')

@@ -917,7 +917,7 @@ def ShowSSHums(DBConn):
 
 def main():
     global filePath, ServerTimeFromUTC, twoWeeksAgo, ServerTimeFromUTCSec, DelOldCsv, haschema, myschema
-    global BeginTime
+    global BeginTime, SaveCSVData
 
     RCGraphs = {'solar', 'laundry', 'hums', 'temps', 'water', 'power', 'heaters'}
     SSGraphs = {'Furnace', 'Temps', 'Hums'}

@@ -51,7 +51,17 @@ DBConn = None
 DBCursor = None
 Topics = []    # default topics to subscribe
 mqtt_msg_table = None
-RequiredConfigParams = frozenset(('ss_ha_schema', 'rc_ha_schema', 'rc_my_schema', 'ss_my_schema', 'rc_database_host', 'rc_database_port', 'ss_database_host', 'ss_database_port', 'database_reader_user', 'database_reader_password'))
+RequiredConfigParams = frozenset(('ss_ha_schema'
+, 'rc_ha_schema'
+, 'rc_my_schema'
+, 'ss_my_schema'
+, 'rc_database_host'
+, 'rc_database_port'
+, 'ss_database_host'
+, 'ss_database_port'
+, 'database_reader_user'
+, 'database_reader_password'
+))
 
 def GetConfigFilePath():
     fp = os.path.join(ProgPath, 'secrets.ini')

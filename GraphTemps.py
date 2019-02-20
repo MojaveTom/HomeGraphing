@@ -67,7 +67,9 @@ def GetConfigFilePath():
 #  global twoWeeksAgo, filePath
 DelOldCsv = False
 twoWeeksAgo = (datetime.today() - timedelta(days=14))
-filePath = os.path.abspath(os.path.join(os.environ['HOME'], 'GraphingData'))
+filePath = os.path.abspath(os.path.expandvars('$HOME/GraphingData'))
+if not os.path.isdir(filePath):
+    os.makedirs(filePath, exist_ok=True)
 ServerTimeFromUTC = timedelta(hours=0)
 ServerTimeFromUTCSec = 0
 haschema = ""

@@ -334,8 +334,8 @@ def ShowRCLaundry(DBConn):
         logger.info("No data to plot")
 
     logger.info("          ----------  OUTSIDE  ----------")
-    query = "SELECT {timeField} AS 'Time', OutsideTemp AS 'Outside' \
-        FROM `{schema}`.`weather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
+    query = "SELECT {timeField} AS 'Time', tempf AS 'Outside' \
+        FROM `{schema}`.`rcweather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
     logger.info("Out Temp SQL: %s", query)
     data = GetData('RcOutTemps.csv', DBConn, query)
     if len(data) > 0:
@@ -387,8 +387,8 @@ def ShowRCSolar(DBConn):
     ax1.set_ylabel('Watts')  # we already handled the x-label with ax1
 
     logger.info("          ----------  SOLAR RADIATION ----------")
-    query = "SELECT {timeField} AS 'Time', SolarRad FROM `{schema}`.`Weather` \
-        WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
+    query = "SELECT {timeField} AS 'Time', solarradiation as SolarRad FROM `{schema}`.`rcweather` \
+        WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
     logger.info('SolarRad query: %s', query)
     data = GetData('SolarRad.csv', DBConn, query)
     ax2.set_ylabel('W/m^2', color='tab:red')  # we already handled the x-label with ax1
@@ -464,8 +464,8 @@ def ShowRCTemps(DBConn):
     plt.set_cmap('Dark2')
 
     logger.info("          ----------  OUTSIDE / INSIDE TEMP  ----------")
-    query = "SELECT {timeField} AS 'Time', OutsideTemp, InsideTemp AS 'Computer' \
-        FROM `{schema}`.`weather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
+    query = "SELECT {timeField} AS 'Time', tempf as 'OutsideTemp', tempinf AS 'Computer' \
+        FROM `{schema}`.`rcweather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
     logger.info("Out, In Temp SQL: %s", query)
     data = GetData('RcWxTemps.csv', DBConn, query)
     if len(data) > 0:
@@ -544,8 +544,8 @@ def ShowRCHums(DBConn):
     plt.set_cmap('Dark2')
 
     logger.info("          ----------  OUTSIDE / INSIDE HUMIDITY ----------")
-    query = "SELECT {timeField} AS 'Time', OutsideHumidity AS 'Outside', InsideHumidity AS 'Computer' \
-        FROM `{schema}`.`weather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
+    query = "SELECT {timeField} AS 'Time', humidity AS 'Outside', humidityin AS 'Computer' \
+        FROM `{schema}`.`rcweather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
     logger.info("Out, In Hum SQL: %s", query)
     data = GetData('RcWxHums.csv', DBConn, query)
     if len(data) > 0:
@@ -627,8 +627,8 @@ def ShowRCHeaters(DBConn):
     plt.set_cmap('Dark2')
 
     logger.info("          ----------  COMPUTER TEMP ----------")
-    query = "SELECT {timeField} AS 'Time', InsideTemp AS 'Computer' \
-        FROM `{schema}`.`weather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
+    query = "SELECT {timeField} AS 'Time', tempinf AS 'Computer' \
+        FROM `{schema}`.`rcweather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
     logger.info("Computer Temp SQL: %s", query)
     data = GetData('ComputerTemp.csv', DBConn, query)
     if len(data) > 0:

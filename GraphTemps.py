@@ -78,7 +78,9 @@ def GetConfigFilePath():
 DelOldCsv = False
 SaveCSVData = True  # Flags GetData function to save back to the CSV data file.
 twoWeeksAgo = (datetime.today() - timedelta(days=14))
-filePath = os.path.abspath(os.path.join(os.environ['HOME'], 'GraphingData'))
+filePath = os.path.abspath(os.path.expandvars('$HOME/GraphingData'))
+if not os.path.isdir(filePath):
+    os.makedirs(filePath, exist_ok=True)
 ServerTimeFromUTC = timedelta(hours=0)
 ServerTimeFromUTCSec = 0
 haschema = ""
@@ -758,8 +760,8 @@ def ShowSSFurnace(DBConn):
     FROM `{schema}`.`mqttmessages` WHERE topic='dc4f220da32f/data' \
     AND {timeField}  > '%s' \
     AND {timeField}  < now(6) /* eliminate spurious records with times too late */ \
-    AND json_value(message, '$.Temperature') < 150 \
-    AND json_value(message, '$.Humidity') < 110 \
+    AND ( json_value(message, '$.Temperature') < 150 \
+    AND json_value(message, '$.Humidity') < 110 OR message IS NULL) \
     ORDER BY {timeField}".format(timeField='RecTime', schema = myschema)
     logger.debug(' SQL query:\n%s', query)
     data = GetData('SSFurnace.csv', DBConn, query)

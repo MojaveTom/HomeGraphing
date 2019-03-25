@@ -30,7 +30,7 @@ import logging.handlers
 import json
 
 ProgName, ext = os.path.splitext(os.path.basename(sys.argv[0]))
-ProgPath = os.path.dirname(sys.argv[0])
+ProgPath = os.path.dirname(os.path.realpath(sys.argv[0]))
 logConfFileName = os.path.join(ProgPath, ProgName + '_loggingconf.json')
 if os.path.isfile(logConfFileName):
     try:
@@ -116,6 +116,7 @@ def main():
     api_key = cfg['ambient_api_key']
     app_key = cfg['ambient_application_key']
     weather_table = cfg['weather_table']
+    myWeatherDevice = cfg['MAC_address']
 
     connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=myschema)
     logger.info("SS weather database connection string: %s", connstr)
@@ -132,9 +133,22 @@ def main():
             , log_file='ambient.log' if Verbosity >= 1 else None \
             )
 
-        device = Ambient_api.get_devices()[0]
-        logger.debug("Weather station info: %s", device.info)
-        logger.debug("MAC address of weather station: %s", device.mac_address)
+        devices = Ambient_api.get_devices()
+        logger.debug("Weather stationS info: %s", devices)
+        device = None
+        for d in devices:
+            logger.debug("Weather station info: %s", d.info)
+            logger.debug("MAC address of weather station: %s", d.mac_address)
+            if d.mac_address == myWeatherDevice.upper():
+                device = d
+                logger.debug('Found desired weather station: %s' % myWeatherDevice)
+                break
+            pass
+
+        if device is None:
+            logger.critical('Desired weather station data not found at AmbientWeather. %s' % myWeatherDevice)
+            exit(1)
+
         result = Iconn.execute("SELECT date FROM `"+myschema+"`.`"+weather_table+"` ORDER BY date DESC LIMIT 2")
         lastTimeInDb = None
         nextToLastTime = None

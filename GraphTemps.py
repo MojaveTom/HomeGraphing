@@ -21,7 +21,7 @@ import logging.handlers
 import json
 
 ProgName, ext = os.path.splitext(os.path.basename(sys.argv[0]))
-ProgPath = os.path.dirname(sys.argv[0])
+ProgPath = os.path.dirname(os.path.realpath(sys.argv[0]))
 logConfFileName = os.path.join(ProgPath, ProgName + '_loggingconf.json')
 if os.path.isfile(logConfFileName):
     try:
@@ -34,7 +34,8 @@ if os.path.isfile(logConfFileName):
             logPath=""
         for p in config_dict['handlers'].keys():
             if 'filename' in config_dict['handlers'][p]:
-                config_dict['handlers'][p]['filename'] = os.path.join(logPath, config_dict['handlers'][p]['filename'])
+                logFileName = os.path.join(logPath, config_dict['handlers'][p]['filename'])
+                config_dict['handlers'][p]['filename'] = logFileName
         logging.config.dictConfig(config_dict)
     except Exception as e:
         print("loading logger config from file failed.")
@@ -50,14 +51,24 @@ DBConn = None
 DBCursor = None
 Topics = []    # default topics to subscribe
 mqtt_msg_table = None
-RequiredConfigParams = frozenset(('ss_ha_schema', 'rc_ha_schema', 'rc_my_schema', 'ss_my_schema', 'rc_database_host', 'rc_database_port', 'ss_database_host', 'ss_database_port', 'database_reader_user', 'database_reader_password'))
+RequiredConfigParams = frozenset(('ss_ha_schema'
+, 'rc_ha_schema'
+, 'rc_my_schema'
+, 'ss_my_schema'
+, 'rc_database_host'
+, 'rc_database_port'
+, 'ss_database_host'
+, 'ss_database_port'
+, 'database_reader_user'
+, 'database_reader_password'
+))
 
 def GetConfigFilePath():
     fp = os.path.join(ProgPath, 'secrets.ini')
     if not os.path.isfile(fp):
         fp = os.environ['PrivateConfig']
         if not os.path.isfile(fp):
-            logger.error('No configuration file found.')
+            logger.error('No configuration file found: %s', fp)
             sys.exit(1)
     logger.info('Using configuration file at: %s', fp)
     return fp
@@ -65,8 +76,11 @@ def GetConfigFilePath():
 
 #  global twoWeeksAgo, filePath
 DelOldCsv = False
+SaveCSVData = True  # Flags GetData function to save back to the CSV data file.
 twoWeeksAgo = (datetime.today() - timedelta(days=14))
-filePath = os.path.abspath(os.path.join(os.environ['HOME'], 'GraphingData'))
+filePath = os.path.abspath(os.path.expandvars('$HOME/GraphingData'))
+if not os.path.isdir(filePath):
+    os.makedirs(filePath, exist_ok=True)
 ServerTimeFromUTC = timedelta(hours=0)
 ServerTimeFromUTCSec = 0
 haschema = ""
@@ -88,11 +102,11 @@ def makeQuery(dataName, tableName, timeField='time', databaseName=None):
 
     return query
 
-def GetData(DBConn, fileName, query, beginDate, dataTimeOffsetUTC=timedelta(0)):
+def GetData(fileName, DBConn = None, query = None):
     """
-        DBConn              <connection>    is the database connection object.
         fileName            <string>        is the file name of a CSV file containing previously retrieved data
                                 relative to global filePath.
+        DBConn              <connection>    is the database connection object.
         query               <string>        is an SQL query to retrieve the data, with %s where the begin date goes.
         beginDate           <datetime>      is the DATE of the beginning of the data to retrieve in SERVER local time.
         dataTimeOffsetUTC   <timedelta>     is the amount to adjust beginDate for selecting new data.
@@ -135,10 +149,13 @@ def GetData(DBConn, fileName, query, beginDate, dataTimeOffsetUTC=timedelta(0)):
         Another example:???
     """
     global filePath
+    # Pick up local variables from globals
+    beginDate = BeginTime
+    SQLbeginDate = beginDate
+    dataTimeOffsetUTC = ServerTimeFromUTC
 
-    logger.debug('call args beginDate = %s dataTimeOffsetUTC = %s', beginDate, dataTimeOffsetUTC)
-    slicer = 'index > "%s"'%(beginDate + dataTimeOffsetUTC).isoformat()     # pandas "query" to remove old data FROM csv data
-    logger.info('slicer = %s', slicer)
+    logger.debug('call args -- fileName: %s, DBConn: %s, query: %s', fileName, DBConn, query)
+    logger.debug('beginDate = %s dataTimeOffsetUTC = %s', beginDate, dataTimeOffsetUTC)
     theFile = os.path.join(filePath, fileName)
     logger.info('theFile: %s', theFile)
     CSVdataRead = False     # flag is true if we read csv data
@@ -149,28 +166,26 @@ def GetData(DBConn, fileName, query, beginDate, dataTimeOffsetUTC=timedelta(0)):
         else:
             fdata = pd.read_csv(theFile, index_col=0, parse_dates=True)
             logger.debug('Num Points from CSV = %s', fdata.size)
-            if (fdata.size > 0) and (fdata.index[0] <= beginDate):
-                beginDate = fdata.index[-1]
+            if (fdata.size <= 0):
+                logger.info("CSV file exists but has no data.") 
+            elif (beginDate is not None) and (fdata.index[0] > beginDate):
+                logger.debug("CSV data all more recent than desired data; ignore it.")
+            else:
+                SQLbeginDate = fdata.index[-1]
                 logger.debug('Last CSV time = new beginDate = %s', beginDate)
                 logger.debug('CSVdata tail:\n%s', fdata.tail())
                 logger.debug('CSVdata dtypes:\n%s', fdata.dtypes)
                 logger.debug('CSVdata columns:\n%s', fdata.columns)
                 logger.debug('CSVdata index:\n%s', fdata.index)
                 CSVdataRead = True
-            elif (fdata.size <= 0):
-                logger.info("CSV file exists but has no data.") 
-            elif (fdata.size > 0) and (fdata.index[0] > beginDate):
-                logger.debug("CSV data all more recent than desired data; ignore it.")
-            else:
-                pass
     else:
         logger.debug('CSV file does not exist.')
         pass
-    beginDate = beginDate - ServerTimeFromUTC + dataTimeOffsetUTC
-    logger.debug('beginDate after CSV modified for SQL = %s', beginDate)
-    logger.debug("Comparing: now UTC time: %s and UTC data time: %s", datetime.utcnow(), (beginDate - dataTimeOffsetUTC))
-    if (not CSVdataRead) or (datetime.utcnow() - beginDate + dataTimeOffsetUTC) > timedelta(minutes=20):
-        myQuery = query%beginDate.isoformat()
+    logger.debug('SQLbeginDate after CSV modified for SQL = %s', SQLbeginDate)
+    logger.debug("Comparing: now UTC time: %s and UTC data time: %s", datetime.utcnow(), (SQLbeginDate - dataTimeOffsetUTC))
+    if (not CSVdataRead) or (datetime.utcnow() - SQLbeginDate + dataTimeOffsetUTC) > timedelta(minutes=20) and DBConn and query:
+        logger.debug('SQLbeginDate for creating SQL query %s', SQLbeginDate)
+        myQuery = query%SQLbeginDate.isoformat()
         logger.info('SQL query: %s', myQuery)
         data = pd.read_sql_query(myQuery, DBConn, index_col='Time')
         if data.index.size != 0:
@@ -203,22 +218,19 @@ def GetData(DBConn, fileName, query, beginDate, dataTimeOffsetUTC=timedelta(0)):
                 pass    # No CSV data, no SQL data:  punt??
             pass
     else:
-        logger.info("CSV data is recent enough; don't query database. ")
-        logger.debug("now %s beginDate %s diff %s", datetime.utcnow(), beginDate, (datetime.utcnow() - beginDate))
+        if DBConn and query:
+            logger.info("CSV data is recent enough; don't query database. ")
+            logger.debug("now %s SQLbeginDate %s diff %s", datetime.utcnow(), SQLbeginDate, (datetime.utcnow() - SQLbeginDate))
+        else:
+            logger.debug('No database parameters defined; no SQL data.')
         data = fdata
         pass
 
     # Only save two weeks of data in the CSV file
-    data.query('index > "%s"'%(twoWeeksAgo + dataTimeOffsetUTC).isoformat()).to_csv(theFile, index='Time')
+    if SaveCSVData: data.query('index > "%s"'% twoWeeksAgo.isoformat()).to_csv(theFile, index='Time')
 
-    # in "context" of calling function
-    tag = os.path.splitext(fileName)[0]
-    logger.debug('head:\n%s', data.head())
-    logger.debug('tail:\n%s', data.tail())
-    logger.debug('dtypes:\n%s', data.dtypes)
-    logger.debug('columns:\n%s', data.columns)
-    logger.debug('index:\n%s', data.index)
-
+    slicer = 'index > "%s"'%(beginDate + dataTimeOffsetUTC).isoformat()     # pandas "query" to remove old data FROM csv data
+    logger.info('slicer = %s', slicer)
     return data.query(slicer)       # return data from beginDate to  present
 
 def ShowRCPower(DBConn):
@@ -226,7 +238,6 @@ def ShowRCPower(DBConn):
 
     ###############################  POWER  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
     ax1.set_xlabel('Date/time')
@@ -241,7 +252,7 @@ def ShowRCPower(DBConn):
         FROM `{schema}`.`MeterData` WHERE \
         {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
     logger.info("House Power SQL: %s", query)
-    data = GetData(DBConn, 'HousePower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('HousePower.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
         if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
@@ -251,7 +262,7 @@ def ShowRCPower(DBConn):
     logger.info("          ----------  HUMIDIFIER POWER ----------")
     query = makeQuery(timeField='time', dataName='Humidifier', tableName='humidifier_power')
     logger.info("Humidifier power SQL: %s", query)
-    data = GetData(DBConn, 'HumidifierPower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('HumidifierPower.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
         if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
@@ -261,7 +272,7 @@ def ShowRCPower(DBConn):
     logger.info("          ----------  FRIDGE POWER ----------")
     query = makeQuery(timeField='time', dataName='Refrigerator', tableName='fridge_power')
     logger.info("Fridge Power SQL: %s", query)
-    data = GetData(DBConn, 'FridgePower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('FridgePower.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
         if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
@@ -271,7 +282,7 @@ def ShowRCPower(DBConn):
     logger.info("          ----------  A/C POWER ----------")
     query = makeQuery(timeField='time', dataName='A/C Power', tableName='ac_power')
     logger.info("AC Power SQL: %s", query)
-    data = GetData(DBConn, 'ACPower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('ACPower.csv', DBConn, query)
     if len(data) > 0:
         if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
         data.plot(ax=ax1)
@@ -281,7 +292,7 @@ def ShowRCPower(DBConn):
     logger.info("          ----------  LR LIGHT POWER ----------")
     query = makeQuery(timeField='time', dataName='LR Light', tableName='lrlight_power')
     logger.info("LR Light SQL: %s", query)
-    data = GetData(DBConn, 'LRLight.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('LRLight.csv', DBConn, query)
     if len(data) > 0:
         if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
         data = pd.concat([data, pd.DataFrame({'LR Light': [data['LR Light'][-1]]}, index=[maxTime])])
@@ -299,7 +310,6 @@ def ShowRCLaundry(DBConn):
     #############    Laundry Trap    #########
 
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     fig = plt.figure(figsize=[15, 5])   #  Define a figure and set its size in inches.
     ax1 = fig.add_subplot(1, 1, 1)      #  Get reference to axes for labeling
     ax1.set_ylabel('°F')
@@ -317,17 +327,17 @@ def ShowRCLaundry(DBConn):
         WHERE {timeField} > '%s' \
         ORDER BY {timeField}".format(timeField='CollectionTime', schema=myschema)
     logger.info('Laundry query:\n%s', query)
-    data = GetData(DBConn, 'LaundryTrap.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('LaundryTrap.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
         logger.info("No data to plot")
 
     logger.info("          ----------  OUTSIDE  ----------")
-    query = "SELECT {timeField} AS 'Time', OutsideTemp AS 'Outside' \
-        FROM `{schema}`.`weather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
+    query = "SELECT {timeField} AS 'Time', tempf AS 'Outside' \
+        FROM `{schema}`.`rcweather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
     logger.info("Out Temp SQL: %s", query)
-    data = GetData(DBConn, 'RcOutTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('RcOutTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -343,7 +353,6 @@ def ShowRCSolar(DBConn):
 
     ###############################  Solar Energy  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     #  Setup the figure with two y axes
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -357,7 +366,7 @@ def ShowRCSolar(DBConn):
         FROM `{schema}`.`SolarEnergy` WHERE Name = 'North Array' AND \
         {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
     logger.info('North Arrray query: %s', query)
-    data = GetData(DBConn, 'NorthArray.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('NorthArray.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -370,7 +379,7 @@ def ShowRCSolar(DBConn):
         FROM `{schema}`.`SolarEnergy` WHERE Name = 'South Array' AND \
         {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
     logger.info('South Arrray query: %s', query)
-    data = GetData(DBConn, 'SouthArray.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SouthArray.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -378,10 +387,10 @@ def ShowRCSolar(DBConn):
     ax1.set_ylabel('Watts')  # we already handled the x-label with ax1
 
     logger.info("          ----------  SOLAR RADIATION ----------")
-    query = "SELECT {timeField} AS 'Time', SolarRad FROM `{schema}`.`Weather` \
-        WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
+    query = "SELECT {timeField} AS 'Time', solarradiation as SolarRad FROM `{schema}`.`rcweather` \
+        WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
     logger.info('SolarRad query: %s', query)
-    data = GetData(DBConn, 'SolarRad.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SolarRad.csv', DBConn, query)
     ax2.set_ylabel('W/m^2', color='tab:red')  # we already handled the x-label with ax1
     ax2.tick_params('y', colors='tab:red')
     if len(data) > 0:
@@ -399,7 +408,6 @@ def ShowRCWater(DBConn):
 
     ###############################  Water  ############################################
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     #  Setup the figure with two y axes
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -417,7 +425,7 @@ def ShowRCWater(DBConn):
         FROM `{schema}`.`MeterData` WHERE \
         {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
     logger.info('GPM query: %s', query)
-    data = GetData(DBConn, 'GPM.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('GPM.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -430,7 +438,7 @@ def ShowRCWater(DBConn):
         FROM `{schema}`.`MeterData` WHERE \
         {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
     logger.info('WellPower query: %s', query)
-    data = GetData(DBConn, 'WellPower.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('WellPower.csv', DBConn, query)
     ax2.set_ylabel('Watts', color='tab:red')  # we already handled the x-label with ax1
     ax2.tick_params('y', colors='tab:red')
     if len(data) > 0:
@@ -447,7 +455,6 @@ def ShowRCTemps(DBConn):
     global filePath
 
             # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     ###############################  Temperatures  ############################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -457,10 +464,10 @@ def ShowRCTemps(DBConn):
     plt.set_cmap('Dark2')
 
     logger.info("          ----------  OUTSIDE / INSIDE TEMP  ----------")
-    query = "SELECT {timeField} AS 'Time', OutsideTemp, InsideTemp AS 'Computer' \
-        FROM `{schema}`.`weather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
+    query = "SELECT {timeField} AS 'Time', tempf as 'OutsideTemp', tempinf AS 'Computer' \
+        FROM `{schema}`.`rcweather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
     logger.info("Out, In Temp SQL: %s", query)
-    data = GetData(DBConn, 'RcWxTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('RcWxTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -469,7 +476,7 @@ def ShowRCTemps(DBConn):
     logger.info("          ----------  THERMOSTAT TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Thermostat', tableName='thermostat_temp')
     logger.info("Thermostat temp SQL: %s", query)
-    data = GetData(DBConn, 'ThermostatTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('ThermostatTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -478,7 +485,7 @@ def ShowRCTemps(DBConn):
     logger.info("          ----------  DINING TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Dining', tableName='dining_temp')
     logger.info("Dining temp SQL: %s", query)
-    data = GetData(DBConn, 'DiningTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('DiningTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -487,7 +494,7 @@ def ShowRCTemps(DBConn):
     logger.info("          ----------  GUEST TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Guest', tableName='guest_temp')
     logger.info("Guest temp SQL: %s", query)
-    data = GetData(DBConn, 'GuestTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('GuestTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -496,7 +503,7 @@ def ShowRCTemps(DBConn):
     logger.info("          ----------  KITCHEN TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_temp')
     logger.info("Kitchen temp SQL: %s", query)
-    data = GetData(DBConn, 'KitchenTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('KitchenTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -505,7 +512,7 @@ def ShowRCTemps(DBConn):
     logger.info("          ----------  MASTER TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Master', tableName='master_temp')
     logger.info("Master temp SQL: %s", query)
-    data = GetData(DBConn, 'MasterTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('MasterTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -514,7 +521,7 @@ def ShowRCTemps(DBConn):
     logger.info("          ----------  LIVING TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Living', tableName='living_temp')
     logger.info("Living temp SQL: %s", query)
-    data = GetData(DBConn, 'LivingTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('LivingTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -528,8 +535,6 @@ def ShowRCTemps(DBConn):
 def ShowRCHums(DBConn):
     global filePath
 
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     ###############################  Humidities  ############################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -539,10 +544,10 @@ def ShowRCHums(DBConn):
     plt.set_cmap('Dark2')
 
     logger.info("          ----------  OUTSIDE / INSIDE HUMIDITY ----------")
-    query = "SELECT {timeField} AS 'Time', OutsideHumidity AS 'Outside', InsideHumidity AS 'Computer' \
-        FROM `{schema}`.`weather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
+    query = "SELECT {timeField} AS 'Time', humidity AS 'Outside', humidityin AS 'Computer' \
+        FROM `{schema}`.`rcweather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
     logger.info("Out, In Hum SQL: %s", query)
-    data = GetData(DBConn, 'RcWxHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('RcWxHums.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -551,7 +556,7 @@ def ShowRCHums(DBConn):
     logger.info("          ----------  THERMOSTAT HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Thermostat', tableName='thermostat_hum')
     logger.info("Thermostat Hum SQL: %s", query)
-    data = GetData(DBConn, 'ThermostatHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('ThermostatHums.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -560,7 +565,7 @@ def ShowRCHums(DBConn):
     logger.info("          ----------  DINING HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Dining', tableName='dining_hum')
     logger.info("Dining Hum SQL: %s", query)
-    data = GetData(DBConn, 'DiningHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('DiningHums.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -569,7 +574,7 @@ def ShowRCHums(DBConn):
     logger.info("          ----------  GUEST HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Guest', tableName='guest_hum')
     logger.info("Guest Hum SQL: %s", query)
-    data = GetData(DBConn, 'GuestHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('GuestHums.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -578,7 +583,7 @@ def ShowRCHums(DBConn):
     logger.info("          ----------  KITCHEN HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_hum')
     logger.info("Kitchen Hum SQL: %s", query)
-    data = GetData(DBConn, 'KitchenHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('KitchenHums.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -587,7 +592,7 @@ def ShowRCHums(DBConn):
     logger.info("          ----------  MASTER HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Master', tableName='master_hum')
     logger.info("Master Hum SQL: %s", query)
-    data = GetData(DBConn, 'MasterHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('MasterHums.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -596,7 +601,7 @@ def ShowRCHums(DBConn):
     logger.info("          ----------  LIVING HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Living', tableName='living_hum')
     logger.info("Living Hum SQL: %s", query)
-    data = GetData(DBConn, 'LivingHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('LivingHums.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -610,8 +615,6 @@ def ShowRCHums(DBConn):
 def ShowRCHeaters(DBConn):
     global filePath
 
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     ###############################  HEATERS  ############################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -624,10 +627,10 @@ def ShowRCHeaters(DBConn):
     plt.set_cmap('Dark2')
 
     logger.info("          ----------  COMPUTER TEMP ----------")
-    query = "SELECT {timeField} AS 'Time', InsideTemp AS 'Computer' \
-        FROM `{schema}`.`weather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
+    query = "SELECT {timeField} AS 'Time', tempinf AS 'Computer' \
+        FROM `{schema}`.`rcweather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
     logger.info("Computer Temp SQL: %s", query)
-    data = GetData(DBConn, 'ComputerTemp.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('ComputerTemp.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -636,7 +639,7 @@ def ShowRCHeaters(DBConn):
     logger.info("          ----------  DINING TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Dining', tableName='dining_temp')
     logger.info("Dining temp SQL: %s", query)
-    data = GetData(DBConn, 'DiningTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('DiningTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -645,7 +648,7 @@ def ShowRCHeaters(DBConn):
     logger.info("          ----------  GUEST TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Guest', tableName='guest_temp')
     logger.info("Guest temp SQL: %s", query)
-    data = GetData(DBConn, 'GuestTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('GuestTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -654,7 +657,7 @@ def ShowRCHeaters(DBConn):
     logger.info("          ----------  KITCHEN TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_temp')
     logger.info("Kitchen temp SQL: %s", query)
-    data = GetData(DBConn, 'KitchenTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('KitchenTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -663,7 +666,7 @@ def ShowRCHeaters(DBConn):
     logger.info("          ----------  MASTER TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Master', tableName='master_temp')
     logger.info("Master temp SQL: %s", query)
-    data = GetData(DBConn, 'MasterTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('MasterTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -672,7 +675,7 @@ def ShowRCHeaters(DBConn):
     logger.info("          ----------  LIVING TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Living', tableName='living_temp')
     logger.info("Living temp SQL: %s", query)
-    data = GetData(DBConn, 'LivingTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('LivingTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -681,7 +684,7 @@ def ShowRCHeaters(DBConn):
     logger.info("          ----------  COMPUTER HEATER POWER  ----------")
     query = makeQuery(timeField='time', dataName='Computer', tableName='computer_heater_power')
     logger.info("Dining H Power SQL: %s", query)
-    data = GetData(DBConn, 'ComputerHeaterWatts.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('ComputerHeaterWatts.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax2)
     else:
@@ -690,7 +693,7 @@ def ShowRCHeaters(DBConn):
     logger.info("          ----------  DINING HEATER POWER  ----------")
     query = makeQuery(timeField='time', dataName='Dining', tableName='dining_heater_power')
     logger.info("Dining H Power SQL: %s", query)
-    data = GetData(DBConn, 'DiningHeaterWatts.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('DiningHeaterWatts.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax2)
     else:
@@ -699,7 +702,7 @@ def ShowRCHeaters(DBConn):
     logger.info("          ----------  GUEST HEATER POWER  ----------")
     query = makeQuery(timeField='time', dataName='Guest', tableName='guest_heater_power')
     logger.info("Guest H Power SQL: %s", query)
-    data = GetData(DBConn, 'GuestHeaterWatts.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('GuestHeaterWatts.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax2)
     else:
@@ -708,7 +711,7 @@ def ShowRCHeaters(DBConn):
     logger.info("          ----------  KITCHEN HEATER POWER  ----------")
     query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_heater_power')
     logger.info("Kitchen H Power SQL: %s", query)
-    data = GetData(DBConn, 'KitchenHeaterWatts.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('KitchenHeaterWatts.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax2)
     else:
@@ -717,7 +720,7 @@ def ShowRCHeaters(DBConn):
     logger.info("          ----------  MASTER HEATER POWER  ----------")
     query = makeQuery(timeField='time', dataName='Master', tableName='master_heater_power')
     logger.info("Master H Power SQL: %s", query)
-    data = GetData(DBConn, 'MasterHeaterWatts.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('MasterHeaterWatts.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax2)
     else:
@@ -726,7 +729,7 @@ def ShowRCHeaters(DBConn):
     logger.info("          ----------  LIVING HEATER POWER  ----------")
     query = makeQuery(timeField='time', dataName='Living', tableName='living_heater_power')
     logger.info("Living H Power SQL: %s", query)
-    data = GetData(DBConn, 'LivingHeaterWatts.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('LivingHeaterWatts.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax2)
     else:
@@ -741,8 +744,6 @@ def ShowRCHeaters(DBConn):
 def ShowSSFurnace(DBConn):
     global filePath
     ###############################  SS Furnace  ############################################
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     fig = plt.figure(figsize=[15, 5])   #  Define a figure and set its size in inches.
     ax1 = fig.add_subplot(1, 1, 1)      #  Get reference to axes for labeling
   # ax1.set_ylabel('°F')
@@ -759,11 +760,11 @@ def ShowSSFurnace(DBConn):
     FROM `{schema}`.`mqttmessages` WHERE topic='dc4f220da32f/data' \
     AND {timeField}  > '%s' \
     AND {timeField}  < now(6) /* eliminate spurious records with times too late */ \
-    AND json_value(message, '$.Temperature') < 150 \
-    AND json_value(message, '$.Humidity') < 110 \
+    AND ( json_value(message, '$.Temperature') < 150 \
+    AND json_value(message, '$.Humidity') < 110 OR message IS NULL) \
     ORDER BY {timeField}".format(timeField='RecTime', schema = myschema)
     logger.debug(' SQL query:\n%s', query)
-    data = GetData(DBConn, 'SSFurnace.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SSFurnace.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
         ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
@@ -774,9 +775,6 @@ def ShowSSFurnace(DBConn):
 
 def ShowSSTemps(DBConn):
     global filePath
-
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     ###############################  SS Temperatures  ##########################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -791,7 +789,7 @@ def ShowSSTemps(DBConn):
     FROM `{schema}`.`weather` WHERE {timeField}  > '%s' \
     ORDER BY {timeField}".format(timeField='date', schema = myschema)
     logger.debug(' SQL query:\n%s', query)
-    data = GetData(DBConn, 'SSWeatherTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SSWeatherTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -800,7 +798,7 @@ def ShowSSTemps(DBConn):
     logger.info("          ----------  MASTER TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Master', tableName='master_temp', databaseName=myschema)
     logger.info("Master temp SQL: %s", query)
-    data = GetData(DBConn, 'SSMasterTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SSMasterTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -809,7 +807,7 @@ def ShowSSTemps(DBConn):
     logger.info("          ----------  LIVING TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Living', tableName='living_temp', databaseName=myschema)
     logger.info("Living temp SQL: %s", query)
-    data = GetData(DBConn, 'SSLivingTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SSLivingTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -818,7 +816,7 @@ def ShowSSTemps(DBConn):
     logger.info("          ----------  COMPUTER TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Computer', tableName='computer_temp', databaseName=myschema)
     logger.info("Computer temp SQL: %s", query)
-    data = GetData(DBConn, 'SSComputerTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SSComputerTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -827,7 +825,7 @@ def ShowSSTemps(DBConn):
     logger.info("          ----------  KITCHEN TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_temp', databaseName=myschema)
     logger.info("Kitchen temp SQL: %s", query)
-    data = GetData(DBConn, 'SSKitchenTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SSKitchenTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -836,7 +834,7 @@ def ShowSSTemps(DBConn):
     logger.info("          ----------  MUD TEMP  ----------")
     query = makeQuery(timeField='time', dataName='Mud', tableName='mud_temp', databaseName=myschema)
     logger.info("Mud temp SQL: %s", query)
-    data = GetData(DBConn, 'SSMudTemps.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SSMudTemps.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -849,9 +847,6 @@ def ShowSSTemps(DBConn):
 
 def ShowSSHums(DBConn):
     global filePath
-
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    beginDate = BeginTime
     ###############################  SS Humidities    ##########################################
     fig = plt.figure(figsize=[15, 5])
     ax1 = fig.add_subplot(1, 1, 1)
@@ -866,7 +861,7 @@ def ShowSSHums(DBConn):
     FROM `{schema}`.`weather` WHERE {timeField}  > '%s' \
     ORDER BY {timeField}".format(timeField='date', schema = myschema)
     logger.info(' SQL query:\n%s', query)
-    data = GetData(DBConn, 'SSWeatherHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SSWeatherHums.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -875,7 +870,7 @@ def ShowSSHums(DBConn):
     logger.info("          ----------  MASTER HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Master', tableName='master_hum', databaseName=myschema)
     logger.info("Master Hum SQL: %s", query)
-    data = GetData(DBConn, 'SSMasterHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SSMasterHums.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -884,7 +879,7 @@ def ShowSSHums(DBConn):
     logger.info("          ----------  LIVING HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Living', tableName='living_hum', databaseName=myschema)
     logger.info("Living Hum SQL: %s", query)
-    data = GetData(DBConn, 'SSLivingHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SSLivingHums.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -893,7 +888,7 @@ def ShowSSHums(DBConn):
     logger.info("          ----------  COMPUTER HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Computer', tableName='computer_hum', databaseName=myschema)
     logger.info("Computer Hum SQL: %s", query)
-    data = GetData(DBConn, 'SSComputerHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SSComputerHums.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -902,7 +897,7 @@ def ShowSSHums(DBConn):
     logger.info("          ----------  KITCHEN HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_hum', databaseName=myschema)
     logger.info("Kitchen Hum SQL: %s", query)
-    data = GetData(DBConn, 'SSKitchenHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SSKitchenHums.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -911,7 +906,7 @@ def ShowSSHums(DBConn):
     logger.info("          ----------  MUD HUMIDITY ----------")
     query = makeQuery(timeField='time', dataName='Mud', tableName='mud_hum', databaseName=myschema)
     logger.info("Mud Hum SQL: %s", query)
-    data = GetData(DBConn, 'SSMudHums.csv', query, beginDate, dataTimeOffsetUTC=ServerTimeFromUTC)
+    data = GetData('SSMudHums.csv', DBConn, query)
     if len(data) > 0:
         data.plot(ax=ax1)
     else:
@@ -924,7 +919,7 @@ def ShowSSHums(DBConn):
 
 def main():
     global filePath, ServerTimeFromUTC, twoWeeksAgo, ServerTimeFromUTCSec, DelOldCsv, haschema, myschema
-    global BeginTime
+    global BeginTime, SaveCSVData
 
     RCGraphs = {'solar', 'laundry', 'hums', 'temps', 'water', 'power', 'heaters'}
     SSGraphs = {'Furnace', 'Temps', 'Hums'}
@@ -942,14 +937,17 @@ def main():
     parser.add_argument("-T", "--SSTemperatures", dest="Temps", action="store_true", help="Show Steamboat Temperatures graph.")
     parser.add_argument("-v", "--verbosity", dest="verbosity", action="count", help="increase output verbosity", default=0)
     parser.add_argument("--DeleteOldCSVData", dest="DeleteOld", action="store_true", help="Delete any existing CSV data for selected graphs before retrieving new.")
+    parser.add_argument("--DontSaveCSVData", dest="DontSaveCSVdata", action="store_true", default=False, help="Do NOT save CSV data for selected graphs.")
     args = parser.parse_args()
     Verbosity = args.verbosity
     DelOldCsv = args.DeleteOld
+    SaveCSVData = not args.DontSaveCSVdata
     numDays = float(args.days)
 
     desired_plots = {k for k, v in vars(args).items() if v}
     desired_plots.discard('verbosity')      # verbosity not a plotting item
-    desired_plots.discard('DeleteOldCSVData')      # DeleteOldCSVData not a plotting item
+    desired_plots.discard('DeleteOld')      # DeleteOldCSVData not a plotting item
+    desired_plots.discard('DontSaveCSVdata')      # DontSaveCSVdata not a plotting item
     desired_plots.discard('days')      # number of days is not a plotting item
 
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())

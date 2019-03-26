@@ -35,6 +35,9 @@ Thumbs.db
 /.qmake.cache
 /.qmake.stash
 
+# ignore .htm plotting files
+*.htm
+
 # configuration files not to be shared.
 secret*.ini
 

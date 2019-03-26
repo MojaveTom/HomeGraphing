@@ -72,14 +72,17 @@ def GetGraphDefs(GraphDefFile=None):
         GraphDefFile = os.path.join(MyPath, GraphDefFile)
     logger.debug('The GraphDefFile is: %s' % GraphDefFile)
     if os.path.isfile(GraphDefFile):
+        logger.debug('The GraphDefFile "%s" exists' % GraphDefFile)
         with open(GraphDefFile, 'r') as theFile:
             GraphDefs = json.load(theFile)
+            logger.debug('The GraphDefFile "%s" loaded sucessfully' % GraphDefFile)
     else:
-        logger.critical('The graph definition file: %s does not exist.' % GraphDefFile)
+        logger.critical('The graph definition file "%s" does not exist.' % GraphDefFile)
         exit(1)
 
     try:
         GraphDefs = GraphDefsSchema.validate(GraphDefs)
+        logger.debug('Graph definitions file is valid.')
     except SchemaError as e:
         logger.critical('Graph definition dictionary is not valid.  %s', e)
         logger.debug('%s' % e.autos)

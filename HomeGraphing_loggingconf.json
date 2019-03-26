@@ -29,7 +29,7 @@
             "class": "logging.FileHandler",
             "level": "DEBUG",
             "formatter": "extra",
-            "filename": "GraphTemps.log",
+            "filename": "HomeGraphing.log",
             "mode": "w",
             "encoding": "utf8"
         },
@@ -38,7 +38,7 @@
             "class": "logging.handlers.RotatingFileHandler",
             "level": "ERROR",
             "formatter": "extra",
-            "filename": "GraphTemps_errors.log",
+            "filename": "HomeGraphing_errors.log",
             "maxBytes": 1048576,
             "backupCount": 40,
             "encoding": "utf8"
@@ -49,7 +49,7 @@
     "loggers": {
         "__main__": {
             "level": "NOTSET",
-            "handlers": ["console", "debug_file_handler"],
+            "handlers": ["debugconsole", "debug_file_handler"],
             "propagate": false
         }
     },

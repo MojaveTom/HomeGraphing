@@ -2,7 +2,17 @@
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+from bokeh.layouts import gridplot
+from bokeh.plotting import figure, show, output_file
+from bokeh.models import ColumnDataSource, HoverTool, Legend, LegendItem
+from bokeh.models import Range1d, DataRange1d, LinearAxis
+from bokeh.resources import Resources
+from bokeh.embed import file_html
+from bokeh.util.browser import view
+from bokeh.models.formatters import DatetimeTickFormatter
+# from bokeh.models.tickers import DatetimeTicker
+
+import math
 from sqlalchemy import create_engine
 import pymysql as mysql
 import pymysql.err as Error
@@ -19,6 +29,10 @@ import logging
 import logging.config
 import logging.handlers
 import json
+import myPalette
+import itertools
+from GraphDefinitions import GetGraphDefs
+from myPalette import Palette
 
 ProgName, ext = os.path.splitext(os.path.basename(sys.argv[0]))
 ProgPath = os.path.dirname(os.path.realpath(sys.argv[0]))
@@ -44,24 +58,27 @@ if os.path.isfile(logConfFileName):
 
 logger = logging.getLogger(__name__)
 logger.info('logger name is: "%s"', logger.name)
-logging.getLogger('matplotlib.axes._base').setLevel('WARNING')      # turn off matplotlib info & debug messages
-logging.getLogger('matplotlib.font_manager').setLevel('WARNING')
 
 DBConn = None
 DBCursor = None
 Topics = []    # default topics to subscribe
 mqtt_msg_table = None
-RequiredConfigParams = frozenset(('ss_ha_schema'
-, 'rc_ha_schema'
-, 'rc_my_schema'
-, 'ss_my_schema'
-, 'rc_database_host'
-, 'rc_database_port'
-, 'ss_database_host'
-, 'ss_database_port'
-, 'database_reader_user'
-, 'database_reader_password'
+RequiredConfigParams = frozenset((
+    'ss_ha_schema'
+  , 'ss_my_schema'
+  , 'ss_database_host'
+  , 'ss_database_port'
+  , 'rc_ha_schema'
+  , 'rc_my_schema'
+  , 'rc_database_host'
+  , 'rc_database_port'
+  , 'database_reader_user'
+  , 'database_reader_password'
 ))
+
+filePath = os.path.abspath(os.path.expandvars('$HOME/GraphingData'))
+if not os.path.isdir(filePath):
+    os.makedirs(filePath, exist_ok=True)
 
 def GetConfigFilePath():
     fp = os.path.join(ProgPath, 'secrets.ini')
@@ -77,38 +94,16 @@ def GetConfigFilePath():
 #  global twoWeeksAgo, filePath
 DelOldCsv = False
 SaveCSVData = True  # Flags GetData function to save back to the CSV data file.
-twoWeeksAgo = (datetime.today() - timedelta(days=14))
-filePath = os.path.abspath(os.path.expandvars('$HOME/GraphingData'))
-if not os.path.isdir(filePath):
-    os.makedirs(filePath, exist_ok=True)
-ServerTimeFromUTC = timedelta(hours=0)
-ServerTimeFromUTCSec = 0
-haschema = ""
-myschema = ""
 BeginTime = None       # Number of days to plot
+DBHostDict = dict()
 
-    # make sure "fdata" is defined AS a dataframe; value ignored if csv data is read.
-#fdata = pd.DataFrame({ 'A' : 1., 'B' : pd.Timestamp('20130102'), 'C' : pd.Series(1,index=list(range(4)),dtype='float32') })
 
-def makeQuery(dataName, tableName, timeField='time', databaseName=None):
-    global myschema
-
-    if databaseName is None: databaseName = myschema
-    query = "SELECT {timeField} AS 'Time', value AS '{dataName}' \
-    FROM `{databaseName}`.`{tableName}` \
-    WHERE {timeField} > '%s' \
-    ORDER BY {timeField}".format(timeField=timeField, dataName=dataName, tableName=tableName, databaseName=databaseName)
-    logger.debug("generated query is: %s", query)
-
-    return query
-
-def GetData(fileName, DBConn = None, query = None):
+def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict()):
     """
         fileName            <string>        is the file name of a CSV file containing previously retrieved data
                                 relative to global filePath.
         DBConn              <connection>    is the database connection object.
         query               <string>        is an SQL query to retrieve the data, with %s where the begin date goes.
-        beginDate           <datetime>      is the DATE of the beginning of the data to retrieve in SERVER local time.
         dataTimeOffsetUTC   <timedelta>     is the amount to adjust beginDate for selecting new data.
                                 Add this number to a UTC time to get a corresponding time in the DATABASE.
                                 Subtract this number (of hours) from a database time to get UTC.
@@ -146,13 +141,22 @@ def GetData(fileName, DBConn = None, query = None):
         time values in the SERVER timezone; the CSV times are appropriate.  For the WHERE clause beginDate,
         ServerTimeFromUTC=-8 is subtracted from the CSV time, and dataTimeOffsetUTC=-8 is added.
 
-        Another example:???
+        beginDate           <datetime>      is the DATE of the beginning of the data to retrieve in SERVER local time.
     """
-    global filePath
-    # Pick up local variables from globals
-    beginDate = BeginTime
-    SQLbeginDate = beginDate
-    dataTimeOffsetUTC = ServerTimeFromUTC
+    prevLogLevel = logger.getEffectiveLevel()
+    # logger.setLevel('WARNING')
+
+    if (len(hostParams) == 0) or (dataTimeOffsetUTC is None): # no host params, don't try to do database stuff
+        logger.warning('hostParams dict is empty, or no dataTimeOffsetUTC given.  Do not access database.')
+        query = None
+        DBConn = None
+    else:
+        beginDate = hostParams['BeginTime']
+        twoWeeksAgo = hostParams['twoWeeksAgo']
+        DBConn = hostParams['DBEngine'].connect()
+        DBConn.begin()
+
+    SQLbeginDate = beginDate        # initial value; changed later if CSV data read
 
     logger.debug('call args -- fileName: %s, DBConn: %s, query: %s', fileName, DBConn, query)
     logger.debug('beginDate = %s dataTimeOffsetUTC = %s', beginDate, dataTimeOffsetUTC)
@@ -163,13 +167,16 @@ def GetData(fileName, DBConn = None, query = None):
         if DelOldCsv:
             os.remove(theFile)
             logger.info('CSV file deleted.')
+            fdata = None
         else:
             fdata = pd.read_csv(theFile, index_col=0, parse_dates=True)
             logger.debug('Num Points from CSV = %s', fdata.size)
             if (fdata.size <= 0):
                 logger.info("CSV file exists but has no data.") 
+                fdata = None
             elif (beginDate is not None) and (fdata.index[0] > beginDate):
                 logger.debug("CSV data all more recent than desired data; ignore it.")
+                fdata = None
             else:
                 SQLbeginDate = fdata.index[-1]
                 logger.debug('Last CSV time = new beginDate = %s', beginDate)
@@ -179,11 +186,12 @@ def GetData(fileName, DBConn = None, query = None):
                 logger.debug('CSVdata index:\n%s', fdata.index)
                 CSVdataRead = True
     else:
-        logger.debug('CSV file does not exist.')
+        logger.warning('CSV file does not exist.')
+        fdata = None
         pass
     logger.debug('SQLbeginDate after CSV modified for SQL = %s', SQLbeginDate)
     logger.debug("Comparing: now UTC time: %s and UTC data time: %s", datetime.utcnow(), (SQLbeginDate - dataTimeOffsetUTC))
-    if (not CSVdataRead) or (datetime.utcnow() - SQLbeginDate + dataTimeOffsetUTC) > timedelta(minutes=20) and DBConn and query:
+    if ((not CSVdataRead) or (datetime.utcnow() - SQLbeginDate + dataTimeOffsetUTC) > timedelta(minutes=20)) and DBConn and query:
         logger.debug('SQLbeginDate for creating SQL query %s', SQLbeginDate)
         myQuery = query%SQLbeginDate.isoformat()
         logger.info('SQL query: %s', myQuery)
@@ -226,732 +234,160 @@ def GetData(fileName, DBConn = None, query = None):
         data = fdata
         pass
 
+    if data is None:
+        logger.setLevel(prevLogLevel)
+        return data
+
     # Only save two weeks of data in the CSV file
     if SaveCSVData: data.query('index > "%s"'% twoWeeksAgo.isoformat()).to_csv(theFile, index='Time')
 
     slicer = 'index > "%s"'%(beginDate + dataTimeOffsetUTC).isoformat()     # pandas "query" to remove old data FROM csv data
     logger.info('slicer = %s', slicer)
+    logger.setLevel(prevLogLevel)
     return data.query(slicer)       # return data from beginDate to  present
 
-def ShowRCPower(DBConn):
-    global filePath, ServerTimeFromUTC
-
-    ###############################  POWER  ############################################
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    fig = plt.figure(figsize=[15, 5])
-    ax1 = fig.add_subplot(1, 1, 1)
-    ax1.set_xlabel('Date/time')
-    ax1.set_title('Ridgecrest Power')
-    ax1.set_ylabel('Watts')
-    maxTime = 0             # maxTime is used to extend the LR Light data to the end of other data
-    plt.set_cmap('Dark2')
-
-    logger.info("          ----------  HOUSE POWER ----------")
-    query = "SELECT {timeField} AS 'Time', \
-        HousePowerW AS 'House' \
-        FROM `{schema}`.`MeterData` WHERE \
-        {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    logger.info("House Power SQL: %s", query)
-    data = GetData('HousePower.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-        if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  HUMIDIFIER POWER ----------")
-    query = makeQuery(timeField='time', dataName='Humidifier', tableName='humidifier_power')
-    logger.info("Humidifier power SQL: %s", query)
-    data = GetData('HumidifierPower.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-        if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  FRIDGE POWER ----------")
-    query = makeQuery(timeField='time', dataName='Refrigerator', tableName='fridge_power')
-    logger.info("Fridge Power SQL: %s", query)
-    data = GetData('FridgePower.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-        if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  A/C POWER ----------")
-    query = makeQuery(timeField='time', dataName='A/C Power', tableName='ac_power')
-    logger.info("AC Power SQL: %s", query)
-    data = GetData('ACPower.csv', DBConn, query)
-    if len(data) > 0:
-        if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  LR LIGHT POWER ----------")
-    query = makeQuery(timeField='time', dataName='LR Light', tableName='lrlight_power')
-    logger.info("LR Light SQL: %s", query)
-    data = GetData('LRLight.csv', DBConn, query)
-    if len(data) > 0:
-        if (maxTime == 0) or (maxTime < data.index.max()): maxTime = data.index.max()
-        data = pd.concat([data, pd.DataFrame({'LR Light': [data['LR Light'][-1]]}, index=[maxTime])])
-        data.plot(ax=ax1, drawstyle="steps-post")
-    else:
-        logger.info("No data to plot")
-
-    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
-    plt.show()
-    plt.close(fig)
-
-
-def ShowRCLaundry(DBConn):
-    global filePath
-    #############    Laundry Trap    #########
-
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    fig = plt.figure(figsize=[15, 5])   #  Define a figure and set its size in inches.
-    ax1 = fig.add_subplot(1, 1, 1)      #  Get reference to axes for labeling
-    ax1.set_ylabel('°F')
-    ax1.set_xlabel('Date/time')
-    ax1.set_title('Ridgecrest Laundry Trap')
-
-    logger.info("          ----------  LAUNDRY TRAP ----------")
-    query = "SELECT {timeField} AS 'Time', \
-        TrapTemperature*9/5+32 AS 'Trap', \
-        HotWaterValveTemp*9/5+32 AS 'HW',\
-        ColdWaterValveTemp*9/5+32 AS 'CW', \
-        (1-HotWaterValveOFF)*10+20 AS 'HW Valve', \
-        (1-ColdWaterValveOFF)*10+15 AS 'CW Valve' \
-        FROM `{schema}`.`FreezeProtection` \
-        WHERE {timeField} > '%s' \
-        ORDER BY {timeField}".format(timeField='CollectionTime', schema=myschema)
-    logger.info('Laundry query:\n%s', query)
-    data = GetData('LaundryTrap.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  OUTSIDE  ----------")
-    query = "SELECT {timeField} AS 'Time', tempf AS 'Outside' \
-        FROM `{schema}`.`rcweather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
-    logger.info("Out Temp SQL: %s", query)
-    data = GetData('RcOutTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
-    plt.show()
-    plt.close(fig)
-
-
-def ShowRCSolar(DBConn):
-    global filePath
-
-    ###############################  Solar Energy  ############################################
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    #  Setup the figure with two y axes
-    fig = plt.figure(figsize=[15, 5])
-    ax1 = fig.add_subplot(1, 1, 1)
-    ax1.set_xlabel('Date/time')
-    ax1.set_title('Ridgecrest Solar')
-    ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-    plt.set_cmap('Dark2')
-
-    logger.info("          ----------  NORTH SOLAR ----------")
-    query = "SELECT {timeField} AS 'Time', OutWattsNow AS 'North Array' \
-        FROM `{schema}`.`SolarEnergy` WHERE Name = 'North Array' AND \
-        {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    logger.info('North Arrray query: %s', query)
-    data = GetData('NorthArray.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-    ax1.set_ylabel('Watts')  # we already handled the x-label with ax1
-    ax1.legend(loc=2)
-
-    logger.info("          ----------  SOUTH SOLAR ----------")
-    query = "SELECT {timeField} AS 'Time', OutWattsNow AS 'South Array' \
-        FROM `{schema}`.`SolarEnergy` WHERE Name = 'South Array' AND \
-        {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    logger.info('South Arrray query: %s', query)
-    data = GetData('SouthArray.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-    ax1.set_ylabel('Watts')  # we already handled the x-label with ax1
-
-    logger.info("          ----------  SOLAR RADIATION ----------")
-    query = "SELECT {timeField} AS 'Time', solarradiation as SolarRad FROM `{schema}`.`rcweather` \
-        WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
-    logger.info('SolarRad query: %s', query)
-    data = GetData('SolarRad.csv', DBConn, query)
-    ax2.set_ylabel('W/m^2', color='tab:red')  # we already handled the x-label with ax1
-    ax2.tick_params('y', colors='tab:red')
-    if len(data) > 0:
-        data.plot(ax=ax2, color='tab:red')
-    else:
-        logger.info("No data to plot")
-    ax2.legend(loc=5)
-    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
-    plt.show()
-    plt.close(fig)
-
-
-def ShowRCWater(DBConn):
-    global filePath
-
-    ###############################  Water  ############################################
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    #  Setup the figure with two y axes
-    fig = plt.figure(figsize=[15, 5])
-    ax1 = fig.add_subplot(1, 1, 1)
-    ax1.set_xlabel('Date/time')
-    ax1.set_title('Ridgecrest Water')
-    ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-    plt.set_cmap('Dark2')
-
-    #
-    #   Two queries since plotted on different axes.
-    #
-    logger.info("          ----------  GALLONS PER MIN   ----------")
-    query = "SELECT {timeField} AS 'Time', \
-        GPM AS 'Gallons/min' \
-        FROM `{schema}`.`MeterData` WHERE \
-        {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    logger.info('GPM query: %s', query)
-    data = GetData('GPM.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-    ax1.set_ylabel('Gallons Per Minute')  # we already handled the x-label with ax1
-
-    logger.info("          ----------  WATER SYS POWER   ----------")
-    query = "SELECT {timeField} AS 'Time', \
-        AvgWaterPowerW AS 'Well Power' \
-        FROM `{schema}`.`MeterData` WHERE \
-        {timeField} > '%s' ORDER BY {timeField}".format(timeField='Time', schema=myschema)
-    logger.info('WellPower query: %s', query)
-    data = GetData('WellPower.csv', DBConn, query)
-    ax2.set_ylabel('Watts', color='tab:red')  # we already handled the x-label with ax1
-    ax2.tick_params('y', colors='tab:red')
-    if len(data) > 0:
-        data.plot(ax=ax2, color='tab:red')
-    else:
-        logger.info("No data to plot")
-    ax2.legend(loc=5)
-    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
-    plt.show()
-    plt.close(fig)
-
-
-def ShowRCTemps(DBConn):
-    global filePath
-
-            # Supply default beginDate from CURRENT value of twoWeeksAgo
-    ###############################  Temperatures  ############################################
-    fig = plt.figure(figsize=[15, 5])
-    ax1 = fig.add_subplot(1, 1, 1)
-    ax1.set_xlabel('Date/time')
-    ax1.set_title('Ridgecrest Temperatures')
-    ax1.set_ylabel('°F')
-    plt.set_cmap('Dark2')
-
-    logger.info("          ----------  OUTSIDE / INSIDE TEMP  ----------")
-    query = "SELECT {timeField} AS 'Time', tempf as 'OutsideTemp', tempinf AS 'Computer' \
-        FROM `{schema}`.`rcweather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
-    logger.info("Out, In Temp SQL: %s", query)
-    data = GetData('RcWxTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  THERMOSTAT TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Thermostat', tableName='thermostat_temp')
-    logger.info("Thermostat temp SQL: %s", query)
-    data = GetData('ThermostatTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  DINING TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Dining', tableName='dining_temp')
-    logger.info("Dining temp SQL: %s", query)
-    data = GetData('DiningTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  GUEST TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Guest', tableName='guest_temp')
-    logger.info("Guest temp SQL: %s", query)
-    data = GetData('GuestTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  KITCHEN TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_temp')
-    logger.info("Kitchen temp SQL: %s", query)
-    data = GetData('KitchenTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  MASTER TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Master', tableName='master_temp')
-    logger.info("Master temp SQL: %s", query)
-    data = GetData('MasterTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  LIVING TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Living', tableName='living_temp')
-    logger.info("Living temp SQL: %s", query)
-    data = GetData('LivingTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
-    plt.show()
-    plt.close(fig)
-
-
-def ShowRCHums(DBConn):
-    global filePath
-
-    ###############################  Humidities  ############################################
-    fig = plt.figure(figsize=[15, 5])
-    ax1 = fig.add_subplot(1, 1, 1)
-    ax1.set_xlabel('Date/time')
-    ax1.set_title('Ridgecrest Humidities')
-    ax1.set_ylabel('% HUMIDITY')
-    plt.set_cmap('Dark2')
-
-    logger.info("          ----------  OUTSIDE / INSIDE HUMIDITY ----------")
-    query = "SELECT {timeField} AS 'Time', humidity AS 'Outside', humidityin AS 'Computer' \
-        FROM `{schema}`.`rcweather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
-    logger.info("Out, In Hum SQL: %s", query)
-    data = GetData('RcWxHums.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  THERMOSTAT HUMIDITY ----------")
-    query = makeQuery(timeField='time', dataName='Thermostat', tableName='thermostat_hum')
-    logger.info("Thermostat Hum SQL: %s", query)
-    data = GetData('ThermostatHums.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  DINING HUMIDITY ----------")
-    query = makeQuery(timeField='time', dataName='Dining', tableName='dining_hum')
-    logger.info("Dining Hum SQL: %s", query)
-    data = GetData('DiningHums.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  GUEST HUMIDITY ----------")
-    query = makeQuery(timeField='time', dataName='Guest', tableName='guest_hum')
-    logger.info("Guest Hum SQL: %s", query)
-    data = GetData('GuestHums.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  KITCHEN HUMIDITY ----------")
-    query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_hum')
-    logger.info("Kitchen Hum SQL: %s", query)
-    data = GetData('KitchenHums.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  MASTER HUMIDITY ----------")
-    query = makeQuery(timeField='time', dataName='Master', tableName='master_hum')
-    logger.info("Master Hum SQL: %s", query)
-    data = GetData('MasterHums.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  LIVING HUMIDITY ----------")
-    query = makeQuery(timeField='time', dataName='Living', tableName='living_hum')
-    logger.info("Living Hum SQL: %s", query)
-    data = GetData('LivingHums.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
-    plt.show()
-    plt.close(fig)
-
-
-def ShowRCHeaters(DBConn):
-    global filePath
-
-    ###############################  HEATERS  ############################################
-    fig = plt.figure(figsize=[15, 5])
-    ax1 = fig.add_subplot(1, 1, 1)
-    ax1.set_xlabel('Date/time')
-    ax1.set_title('Ridgecrest Heaters')
-    ax1.set_ylabel('°F Temperature')
-    ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-    ax2.set_ylabel('Watts')  # we already handled the x-label with ax1
-    # ax2.tick_params('y')
-    plt.set_cmap('Dark2')
-
-    logger.info("          ----------  COMPUTER TEMP ----------")
-    query = "SELECT {timeField} AS 'Time', tempinf AS 'Computer' \
-        FROM `{schema}`.`rcweather` WHERE {timeField} > '%s' ORDER BY {timeField}".format(timeField='date', schema=myschema)
-    logger.info("Computer Temp SQL: %s", query)
-    data = GetData('ComputerTemp.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  DINING TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Dining', tableName='dining_temp')
-    logger.info("Dining temp SQL: %s", query)
-    data = GetData('DiningTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  GUEST TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Guest', tableName='guest_temp')
-    logger.info("Guest temp SQL: %s", query)
-    data = GetData('GuestTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  KITCHEN TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_temp')
-    logger.info("Kitchen temp SQL: %s", query)
-    data = GetData('KitchenTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  MASTER TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Master', tableName='master_temp')
-    logger.info("Master temp SQL: %s", query)
-    data = GetData('MasterTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  LIVING TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Living', tableName='living_temp')
-    logger.info("Living temp SQL: %s", query)
-    data = GetData('LivingTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  COMPUTER HEATER POWER  ----------")
-    query = makeQuery(timeField='time', dataName='Computer', tableName='computer_heater_power')
-    logger.info("Dining H Power SQL: %s", query)
-    data = GetData('ComputerHeaterWatts.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax2)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  DINING HEATER POWER  ----------")
-    query = makeQuery(timeField='time', dataName='Dining', tableName='dining_heater_power')
-    logger.info("Dining H Power SQL: %s", query)
-    data = GetData('DiningHeaterWatts.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax2)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  GUEST HEATER POWER  ----------")
-    query = makeQuery(timeField='time', dataName='Guest', tableName='guest_heater_power')
-    logger.info("Guest H Power SQL: %s", query)
-    data = GetData('GuestHeaterWatts.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax2)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  KITCHEN HEATER POWER  ----------")
-    query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_heater_power')
-    logger.info("Kitchen H Power SQL: %s", query)
-    data = GetData('KitchenHeaterWatts.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax2)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  MASTER HEATER POWER  ----------")
-    query = makeQuery(timeField='time', dataName='Master', tableName='master_heater_power')
-    logger.info("Master H Power SQL: %s", query)
-    data = GetData('MasterHeaterWatts.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax2)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  LIVING HEATER POWER  ----------")
-    query = makeQuery(timeField='time', dataName='Living', tableName='living_heater_power')
-    logger.info("Living H Power SQL: %s", query)
-    data = GetData('LivingHeaterWatts.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax2)
-    else:
-        logger.info("No data to plot")
-
-    # ax2.legend()
-    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
-    plt.show()
-    plt.close(fig)
-
-
-def ShowSSFurnace(DBConn):
-    global filePath
-    ###############################  SS Furnace  ############################################
-    fig = plt.figure(figsize=[15, 5])   #  Define a figure and set its size in inches.
-    ax1 = fig.add_subplot(1, 1, 1)      #  Get reference to axes for labeling
-  # ax1.set_ylabel('°F')
-    ax1.set_xlabel('Date/time')
-    ax1.set_title('Steamboat Furnace')
-
-
-    logger.info("          ----------  STEAMBOAT FURNACE ----------")
-    query = "SELECT {timeField} AS 'Time', \
-    round(json_value(message, '$.Temperature'), 1) AS 'Temp', \
-    round(json_value(message, '$.Humidity'), 1) AS 'Humidity', \
-    (json_value(message, '$.Burner') = 'ON')*20+20 AS 'Furnace', \
-    (json_value(message, '$.MotionDetected') = 'ON')*10+15 AS 'Motion' \
-    FROM `{schema}`.`mqttmessages` WHERE topic='dc4f220da32f/data' \
-    AND {timeField}  > '%s' \
-    AND {timeField}  < now(6) /* eliminate spurious records with times too late */ \
-    AND ( json_value(message, '$.Temperature') < 150 \
-    AND json_value(message, '$.Humidity') < 110 OR message IS NULL) \
-    ORDER BY {timeField}".format(timeField='RecTime', schema = myschema)
-    logger.debug(' SQL query:\n%s', query)
-    data = GetData('SSFurnace.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-        ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
-        plt.show()
-        plt.close(fig)
-    else:
-        logger.warning("No data to plot for Steamboat Furnace")
-
-def ShowSSTemps(DBConn):
-    global filePath
-    ###############################  SS Temperatures  ##########################################
-    fig = plt.figure(figsize=[15, 5])
-    ax1 = fig.add_subplot(1, 1, 1)
-    ax1.set_xlabel('Date/time')
-    ax1.set_title('Steamboat Temperatures')
-    ax1.set_ylabel('°F')
-
-    logger.info("          ----------  OUTSIDE/INSIDE TEMPS ----------")
-    query = "SELECT {timeField} AS 'Time', \
-    tempf AS 'Outside', \
-    tempinf AS 'Hallway' \
-    FROM `{schema}`.`weather` WHERE {timeField}  > '%s' \
-    ORDER BY {timeField}".format(timeField='date', schema = myschema)
-    logger.debug(' SQL query:\n%s', query)
-    data = GetData('SSWeatherTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  MASTER TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Master', tableName='master_temp', databaseName=myschema)
-    logger.info("Master temp SQL: %s", query)
-    data = GetData('SSMasterTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  LIVING TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Living', tableName='living_temp', databaseName=myschema)
-    logger.info("Living temp SQL: %s", query)
-    data = GetData('SSLivingTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  COMPUTER TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Computer', tableName='computer_temp', databaseName=myschema)
-    logger.info("Computer temp SQL: %s", query)
-    data = GetData('SSComputerTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  KITCHEN TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_temp', databaseName=myschema)
-    logger.info("Kitchen temp SQL: %s", query)
-    data = GetData('SSKitchenTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  MUD TEMP  ----------")
-    query = makeQuery(timeField='time', dataName='Mud', tableName='mud_temp', databaseName=myschema)
-    logger.info("Mud temp SQL: %s", query)
-    data = GetData('SSMudTemps.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
-    plt.show()
-    plt.close(fig)
-
-
-def ShowSSHums(DBConn):
-    global filePath
-    ###############################  SS Humidities    ##########################################
-    fig = plt.figure(figsize=[15, 5])
-    ax1 = fig.add_subplot(1, 1, 1)
-    ax1.set_xlabel('Date/time')
-    ax1.set_title('Steamboat Humidities')
-    ax1.set_ylabel('% HUMIDITY')
-
-    logger.info("          ----------  OUTSIDE/INSIDE HUMIDITIES ----------")
-    query = "SELECT {timeField} AS 'Time', \
-    humidity AS 'Outside', \
-    humidityin AS 'Hallway' \
-    FROM `{schema}`.`weather` WHERE {timeField}  > '%s' \
-    ORDER BY {timeField}".format(timeField='date', schema = myschema)
-    logger.info(' SQL query:\n%s', query)
-    data = GetData('SSWeatherHums.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  MASTER HUMIDITY ----------")
-    query = makeQuery(timeField='time', dataName='Master', tableName='master_hum', databaseName=myschema)
-    logger.info("Master Hum SQL: %s", query)
-    data = GetData('SSMasterHums.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  LIVING HUMIDITY ----------")
-    query = makeQuery(timeField='time', dataName='Living', tableName='living_hum', databaseName=myschema)
-    logger.info("Living Hum SQL: %s", query)
-    data = GetData('SSLivingHums.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  COMPUTER HUMIDITY ----------")
-    query = makeQuery(timeField='time', dataName='Computer', tableName='computer_hum', databaseName=myschema)
-    logger.info("Computer Hum SQL: %s", query)
-    data = GetData('SSComputerHums.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  KITCHEN HUMIDITY ----------")
-    query = makeQuery(timeField='time', dataName='Kitchen', tableName='kitchen_hum', databaseName=myschema)
-    logger.info("Kitchen Hum SQL: %s", query)
-    data = GetData('SSKitchenHums.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    logger.info("          ----------  MUD HUMIDITY ----------")
-    query = makeQuery(timeField='time', dataName='Mud', tableName='mud_hum', databaseName=myschema)
-    logger.info("Mud Hum SQL: %s", query)
-    data = GetData('SSMudHums.csv', DBConn, query)
-    if len(data) > 0:
-        data.plot(ax=ax1)
-    else:
-        logger.info("No data to plot")
-
-    ax1.set_xlim(left=BeginTime, right=(datetime.utcnow() + ServerTimeFromUTC))
-    plt.show()
-    plt.close(fig)
-
+def ShowGraph(graphDict):
+
+    if not graphDict['ShowGraph']:
+        logger.warning('%s is not shown.', graphDict['GraphTitle'])
+        return
+
+    if (len(graphDict['Yaxes']) <= 0) or (len(graphDict['items']) <= 0):
+        logger.debug('No axes or no lines defined for graph "%s"', graphDict['GraphTitle'])
+        return
+
+    if graphDict['DBHost'] not in DBHostDict.keys():
+        logger.warning('Unknown database host "%s" for plot "%s"' % (graphDict['DBHost'], graphDict['GraphTitle']))
+        return
+
+    hostItem = DBHostDict[graphDict['DBHost']]
+
+    # Signal that we want to reference local files for html output.
+    res = Resources(mode='absolute')
+    
+    # output_file(graphDict["outputFile"], title=graphDict['GraphTitle'])
+
+    plot = figure(title=graphDict['GraphTitle']
+            , tools="pan,wheel_zoom,box_zoom,reset,save,box_select"
+            , x_axis_type='datetime'
+            , plot_width=1600, plot_height=800
+            , active_drag="box_zoom"
+            , active_scroll = "wheel_zoom")
+    plot.title.align = "center"
+    plot.title.text_font_size = "25px"
+    plot.xaxis.axis_label = graphDict['XaxisTitle']
+    # plot.xaxis.ticker = DatetimeTicker(num_minor_ticks = 4)
+    plot.xaxis.formatter = DatetimeTickFormatter(seconds=["%M:%S"],
+                                            minutes=["%R"],
+                                            minsec=["%M:%S"],
+                                            hours=["%R"],
+                                            hourmin = ["%m/%d %R"],
+                                            days = ['%m/%d'])
+    plot.toolbar.logo = None
+    legend = Legend()
+    # legend.items = [LegendItem(label="--- Left Axis ---"   , renderers=[])]
+    legend.items = []
+    
+    #########   Setup Y axes
+    ## Colors
+    plot.yaxis.visible = False
+    extra_y_ranges = {}
+    
+    for i in range(len(graphDict['Yaxes'])):
+        ya = graphDict['Yaxes'][i]
+        eyrName = 'Y%s_axis' % i
+        clr = ya['color_map']
+        if clr is None: clr = graphDict["graph_color_map"]
+        ya["cmap"] = myPalette.Palette(clr, graphDict['max_palette_len'])
+        clr = ya['color']
+        if clr is None: clr = "black"
+        side = ya['location']
+        extra_y_ranges[eyrName] = DataRange1d(range_padding = 0.01)
+        plot.extra_y_ranges = extra_y_ranges
+        plot.add_layout(LinearAxis(
+                y_range_name=eyrName,
+                axis_label=ya['title'],
+                axis_line_color=clr,
+                major_label_text_color=clr,
+                axis_label_text_color=clr,
+                major_tick_line_color=clr,
+                minor_tick_line_color=clr
+            ), side)
+
+
+    for i in range(len(graphDict['items'])):
+        item = graphDict['items'][i]
+        logger.info('--------------  %s  ------------' % item['dataname'])
+        ya = graphDict['Yaxes'][item['axisNum']]
+        colorGroup = ya['title']
+        query = item['query'].format(
+              my_schema=hostItem['myschema']
+            , ha_schema=hostItem['haschema']
+            )
+        if item['dataTimeZone'] == 'UTC':
+            dataTimeOffsetUTC = 0
+        else:
+            dataTimeOffsetUTC = hostItem['ServerTimeFromUTC']
+        data = GetData(item['datafile'], query, dataTimeOffsetUTC, hostItem)
+        if data is None:
+            logger.warning('item "%s" of graph "%s" has no data and is skipped.' % (item['dataname'], graphDict['GraphTitle']))
+            continue
+        else:
+            logger.debug('Got %s rows of data.' % data.size)
+        data = ColumnDataSource(data)
+        logger.debug('data column names are: %s; num rows is:  %s' % (data.column_names, data.to_df().size))
+        yRangeName = 'Y%s_axis' % item['axisNum']
+        for thisCol in data.column_names[1:]:
+            logger.debug('Column "%s" is plotted against y axis: "%s"' % (thisCol, yRangeName))
+            itemColor = item["color"]
+            if item["color"] is None:
+                itemColor = ya['cmap'].nextColor(colorGroup)
+            else:
+                logger.debug('item color "%s" is defined in the item definition.' % itemColor)
+            r = eval('''plot.%s(x=data.column_names[0]
+                , y = thisCol
+                , source=data
+                , color = itemColor, alpha=0.5
+                , muted_color = itemColor, muted_alpha=1
+                , name = thisCol
+                , y_range_name=yRangeName)'''%item['lineType'])
+            for (k, v) in item['lineMods'].items():
+                s = 'r.%s = %s'%(k, v)
+                logger.debug('Executing line mod "%s"' % s)
+                exec(s)
+            extra_y_ranges[yRangeName].renderers.append(r)
+            if item['includeInLegend']: legend.items.append(LegendItem(label=thisCol, renderers=[r]))
+    plot.add_layout(legend)
+    plot.legend.location = "top_left"
+    plot.legend.click_policy = "mute"
+    plot.add_tools(HoverTool(
+        tooltips=[
+              ( '',  '$name' ) # use @{ } for field names with spaces
+            , ( '',  '$y{0.0}' ) # use @{ } for field names with spaces
+            , ( '',   '@Time{%F %T}'   )
+            ],
+            formatters={
+                'Time' : 'datetime' # use 'datetime' formatter for 'x' field
+                                        # use default 'numeral' formatter for other fields
+            }))
+    
+    # show(plot)
+    html = file_html(plot, res, graphDict['GraphTitle'])
+    f = open(graphDict["outputFile"], mode='w')
+    f.write(html)
+    f.close()
+    view(graphDict["outputFile"], new='tab')
 
 def main():
-    global filePath, ServerTimeFromUTC, twoWeeksAgo, ServerTimeFromUTCSec, DelOldCsv, haschema, myschema
-    global BeginTime, SaveCSVData
+    global DelOldCsv, SaveCSVData, DBHostDict
 
-    RCGraphs = {'solar', 'laundry', 'hums', 'temps', 'water', 'power', 'heaters'}
-    SSGraphs = {'Furnace', 'Temps', 'Hums'}
-    parser = argparse.ArgumentParser(description = 'Display graphs of home parameters.\nDefaults to show all.')
-    parser.add_argument("-d", "--days", dest="days", action="store", help="Number of days of data to plot", default=14)
-    parser.add_argument("-l", "--laundry", dest="laundry", action="store_true", help="Show Ridgecrest Laundry Trap graph.")
-    parser.add_argument("-s", "--solar", dest="solar", action="store_true", help="Show Ridgecrest Solar graph.")
-    parser.add_argument("-u", "--humidities", dest="hums", action="store_true", help="Show Ridgecrest Humidities graph.")
-    parser.add_argument("-t", "--temperatures", dest="temps", action="store_true", help="Show Ridgecrest Temperatures graph.")
-    parser.add_argument("-w", "--water", dest="water", action="store_true", help="Show Ridgecrest Water graph.")
-    parser.add_argument("-e", "--heaters", dest="heaters", action="store_true", help="Show Ridgecrest Heaters graph.")
-    parser.add_argument("-p", "--power", dest="power", action="store_true", help="Show Ridgecrest Power graph.")
-    parser.add_argument("-F", "--SSFurnace", dest="Furnace", action="store_true", help="Show Steamboat Furnace graph.")
-    parser.add_argument("-H", "--SSHumidities", dest="Hums", action="store_true", help="Show Steamboat Humidities graph.")
-    parser.add_argument("-T", "--SSTemperatures", dest="Temps", action="store_true", help="Show Steamboat Temperatures graph.")
-    parser.add_argument("-v", "--verbosity", dest="verbosity", action="count", help="increase output verbosity", default=0)
-    parser.add_argument("--DeleteOldCSVData", dest="DeleteOld", action="store_true", help="Delete any existing CSV data for selected graphs before retrieving new.")
-    parser.add_argument("--DontSaveCSVData", dest="DontSaveCSVdata", action="store_true", default=False, help="Do NOT save CSV data for selected graphs.")
-    args = parser.parse_args()
-    Verbosity = args.verbosity
-    DelOldCsv = args.DeleteOld
-    SaveCSVData = not args.DontSaveCSVdata
-    numDays = float(args.days)
-
-    desired_plots = {k for k, v in vars(args).items() if v}
-    desired_plots.discard('verbosity')      # verbosity not a plotting item
-    desired_plots.discard('DeleteOld')      # DeleteOldCSVData not a plotting item
-    desired_plots.discard('DontSaveCSVdata')      # DontSaveCSVdata not a plotting item
-    desired_plots.discard('days')      # number of days is not a plotting item
-
+    RCGraphs = {'RCSolar', 'RCLaundry', 'RCHums', 'RCTemps', 'RCWater', 'RCPower', 'RCHeaters'}
+    SSGraphs = {'SSFurnace', 'SSTemps', 'SSHums'}
+ 
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
     configFile = GetConfigFilePath()
+    configFileDir = os.path.dirname(configFile)
+    defaultGraphsDefinitionFile = os.path.join(configFileDir, "AllGraphs.json")
 
     config.read(configFile)
     cfgSection = os.path.basename(sys.argv[0])+"/"+os.environ['HOST']
@@ -965,92 +401,139 @@ def main():
 
     cfg = config[cfgSection]
 
-    configGraphs = []
-    if config.has_option(cfgSection, 'default_rc_graphs'):
-        configGraphs.extend(cfg['default_rc_graphs'].split())
-        logger.debug('configGraphs for rc is %s', configGraphs)
-    if config.has_option(cfgSection, 'default_ss_graphs'):
-        configGraphs.extend(cfg['default_ss_graphs'].split())
-        logger.debug('configGraphs for rc and ss is %s', configGraphs)
-    if len(desired_plots) == 0 and len(configGraphs) > 0:     # no options given, provide a default set from config.
-        desired_plots = set(configGraphs)        # config graphs
+    parser = argparse.ArgumentParser(description = 'Display graphs of home parameters.\nDefaults to show all.')
+    parser.add_argument("plots", action="append", nargs="*", help="Optional list of plots to generate.")
+    parser.add_argument("-d", "--days", dest="days", action="store", help="Number of days of data to plot", default=14)
+    parser.add_argument("-l", "--laundry", dest="plots", action="append_const", const="RCLaundry", help="Show Ridgecrest Laundry Trap graph.")
+    parser.add_argument("-s", "--solar", dest="plots", action="append_const", const="RCSolar", help="Show Ridgecrest Solar graph.")
+    parser.add_argument("-u", "--humidities", dest="plots", action="append_const", const="RCHums", help="Show Ridgecrest Humidities graph.")
+    parser.add_argument("-t", "--temperatures", dest="plots", action="append_const", const="RCTemps", help="Show Ridgecrest Temperatures graph.")
+    parser.add_argument("-w", "--water", dest="plots", action="append_const", const="RCWater", help="Show Ridgecrest Water graph.")
+    parser.add_argument("-e", "--heaters", dest="plots", action="append_const", const="RCHeaters", help="Show Ridgecrest Heaters graph.")
+    parser.add_argument("-p", "--power", dest="plots", action="append_const", const="RCPower", help="Show Ridgecrest Power graph.")
+    parser.add_argument("-F", "--SSFurnace", dest="plots", action="append_const", const="SSFurnace", help="Show Steamboat Furnace graph.")
+    parser.add_argument("-H", "--SSHumidities", dest="plots", action="append_const", const="SSHums", help="Show Steamboat Humidities graph.")
+    parser.add_argument("-T", "--SSTemperatures", dest="plots", action="append_const", const="SSTemps", help="Show Steamboat Temperatures graph.")
+    parser.add_argument("-v", "--verbosity", dest="verbosity", action="count", help="increase output verbosity", default=0)
+    parser.add_argument("--DeleteOldCSVData", dest="DeleteOld", action="store_true", help="Delete any existing CSV data for selected graphs before retrieving new.")
+    parser.add_argument("--DontSaveCSVData", dest="DontSaveCSVdata", action="store_true", default=False, help="Do NOT save CSV data for selected graphs.")
+    parser.add_argument("-g", "--graphs", dest="graphDefs", action="store", help="Name of graph definition file", default=defaultGraphsDefinitionFile)
+    args = parser.parse_args()
+    Verbosity = args.verbosity
+    DelOldCsv = args.DeleteOld
+    SaveCSVData = not args.DontSaveCSVdata
+    numDays = float(args.days)
 
+    desired_plots = set()
+    fap = itertools.chain.from_iterable(args.plots)
+    logger.debug('plots args --flattened-- is: "%s"' % fap)
+    logger.debug('There are %s plot items specified on the command line.' % len(args.plots))
+    for i in range(len(args.plots)):
+        itm = args.plots[i]
+        logger.debug('Plots item %s is %s' % (i, itm))
+        if len(itm) > 0:
+            if isinstance(itm, str):
+                logger.debug('plots item is a str: "%s"' % itm)
+                desired_plots.add(itm)
+            elif isinstance(itm, list):
+                logger.debug('plots item is a list')
+                for j in itm:
+                    desired_plots.add(j)
+
+    logger.debug('Desired plots is: %s'%(desired_plots,))
+
+    allKnownPlots = SSGraphs.union(RCGraphs)
+    if len(desired_plots) > 0:
+        plotlist = list(desired_plots)
+        for p in plotlist:
+            if p not in allKnownPlots:
+                logger.warning('Plot: "%s" is unknown, and will be ignored.' % p)
+                desired_plots.remove(p)
     if len(desired_plots) == 0:     # no options given, and no config graphs, provide a default set.
-        desired_plots = SSGraphs.union(RCGraphs)        # all graphs
-        logger.debug('No plots specified on command lind or config file; plot all known.')
+        desired_plots = allKnownPlots        # all graphs
+        logger.debug('No known plots specified on command line; plot all known.')
     logger.info('Desired plots set is: %s', desired_plots)
     logger.info('Command line contains RC graphs: %s', not RCGraphs.isdisjoint(desired_plots))
     logger.info('Command line contains SS graphs: %s', not SSGraphs.isdisjoint(desired_plots))
 
+    GraphDefs = GetGraphDefs(args.graphDefs)
 
-    if  not RCGraphs.isdisjoint(desired_plots):
+    #  Here we compute some helper fields in the GraphDefs dictionary.
+    #  Do this here because we don't want to pollute the GetGraphDefs function
+    # with a bunch of imports and code it doesn't need to do its job.
+    DBHosts = set()
+    gdks = set(GraphDefs.keys())
+    logger.debug('Graphs defined in the graph defs file are: %s' % gdks)
+    desired_plots = desired_plots.intersection(gdks)
+    if len(desired_plots) == 0:
+        logger.debug('No desired plots are defined in the graph defs file.')
+        exit(4)
+    logger.debug('Desired plots set after checking the graph defs file is: %s', desired_plots)
+    for k in gdks:
+        logger.debug('Checking if desired plot "%s" is defined.' % k)
+        if k not in desired_plots:
+            del GraphDefs[k]    # delete graph defs for undesired plots
+            continue
+        gd = GraphDefs[k]
+        DBHosts.add(gd["DBHost"])
+        numYAxes = len(gd['Yaxes'])
+        for a in gd['Yaxes']:
+            a['vars'] = []
+        for itm in gd['items']:
+            if int(itm['axisNum']) >= numYAxes:
+                logger.error('In GraphDefs["%s"], item "%s" references an unknown Y axis.' % (k, itm["dataname"]))
+                exit(2)
+            gd['Yaxes'][itm['axisNum']]['vars'].extend(itm['variableNames'])
+        mpl = 0
+        for a in gd['Yaxes']:
+            mpl = max(mpl, len(a['vars']))
+        gd['max_palette_len'] = mpl
+        pass
+    if len(GraphDefs) == 0:
+        logger.warning('None of the desired plots are in the graph definitions file.')
+        exit(3)
+    logger.info('DBHosts for this graph def file are: %s' % DBHosts)
+    # GraphDefs['_DBHosts'] = dict(zip(DBHosts, "a"*len(DBHosts)))
+    for h in DBHosts:
+        DBHostDict[h] = dict()
+        dbhd = DBHostDict[h]
         user = cfg['database_reader_user']
         pwd  = cfg['database_reader_password']
-        host = cfg['rc_database_host']
-        port = cfg['rc_database_port']
-        haschema = cfg['rc_ha_schema']
-        myschema = cfg['rc_my_schema']
-        logger.info("RC user %s", user)
-        logger.info("RC pwd %s", pwd)
-        logger.info("RC host %s", host)
-        logger.info("RC port %s", port)
-        logger.info("RC haschema %s", haschema)
-        logger.info("RC myschema %s", myschema)
+        host = cfg['%s_database_host'%h]
+        port = cfg['%s_database_port'%h]
+        dbhd['haschema'] = cfg['%s_ha_schema'%h]
+        dbhd['myschema'] = cfg['%s_my_schema'%h]
+        logger.info("%s user %s"%(h, user))
+        logger.info("%s pwd %s"%(h, pwd))
+        logger.info("%s host %s"%(h, host))
+        logger.info("%s port %s"%(h, port))
+        logger.info("%s haschema %s"%(h, dbhd['haschema']))
+        logger.info("%s myschema %s"%(h, dbhd['myschema']))
 
-        connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=haschema)
-        logger.debug("RC database connection string: %s", connstr)
+        connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=dbhd['haschema'])
+        logger.debug("%s database connection string: %s" % (h, connstr))
         Eng = create_engine(connstr, echo = True if Verbosity>=2 else False, logging_name = logger.name)
+        dbhd['DBEngine'] = Eng
         logger.debug(Eng)
         with Eng.connect() as conn, conn.begin():
+            dbhd['conn'] = conn
             result = conn.execute("select timestampdiff(hour, utc_timestamp(), now());")
             for row in result:
                 ServerTimeFromUTC = timedelta(hours=row[0])
-                ServerTimeFromUTCSec = ServerTimeFromUTC.days*86400+ServerTimeFromUTC.seconds
-            twoWeeksAgo = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=14))
-            BeginTime = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
-            logger.debug("RC Server time offset from UTC: %s", ServerTimeFromUTC)
-            logger.debug("RC Server time offset from UTC (seconds): %s", ServerTimeFromUTCSec)
-            logger.debug("RC twoWeeksAgo: %s", twoWeeksAgo)
-            if 'laundry'    in desired_plots:   ShowRCLaundry(conn)
-            if 'solar'      in desired_plots:   ShowRCSolar(conn)
-            if 'temps'      in desired_plots:   ShowRCTemps(conn)
-            if 'hums'       in desired_plots:   ShowRCHums(conn)
-            if 'heaters'    in desired_plots:   ShowRCHeaters(conn)
-            if 'water'      in desired_plots:   ShowRCWater(conn)
-            if 'power'      in desired_plots:   ShowRCPower(conn)
+            dbhd['twoWeeksAgo'] = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=14))
+            dbhd['BeginTime'] = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
+            dbhd['ServerTimeFromUTC'] = ServerTimeFromUTC
+            logger.debug("%s Server time offset from UTC: %s" % (h, dbhd['ServerTimeFromUTC']))
+            logger.debug("%s BeginTime: %s" % (h, dbhd['BeginTime']))
+            logger.debug("%s twoWeeksAgo: %s" % (h, dbhd['twoWeeksAgo']))
 
-    if  not SSGraphs.isdisjoint(desired_plots):
-        user = cfg['database_reader_user']
-        pwd  = cfg['database_reader_password']
-        host = cfg['ss_database_host']
-        port = cfg['ss_database_port']
-        haschema = cfg['ss_ha_schema']
-        myschema = cfg['ss_my_schema']
-        logger.info("SS user %s", user)
-        logger.info("SS pwd %s", pwd)
-        logger.info("SS host %s", host)
-        logger.info("SS port %s", port)
-        logger.info("SS haschema %s", haschema)
-        logger.info("SS myschema %s", myschema)
+    logger.debug('GraphDefs dict is: %s' % json.dumps(GraphDefs, indent=2))
+        # items in DBHostDict are not serializable, so can't dump them
+    # logger.debug('DBHostDict is: %s' % json.dumps(DBHostDict, indent=2))
 
-        connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=haschema)
-        logger.debug("SS database connection string: %s", connstr)
-        Eng = create_engine(connstr, echo = True if Verbosity>=2 else False, logging_name = logger.name)
-        logger.debug(Eng)
-        with Eng.connect() as conn, conn.begin():
-            result = conn.execute("select timestampdiff(hour, utc_timestamp(), now());")
-            for row in result:
-                ServerTimeFromUTC = timedelta(hours=row[0])
-                ServerTimeFromUTCSec = ServerTimeFromUTC.days*86400+ServerTimeFromUTC.seconds
-            twoWeeksAgo = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=14))
-            BeginTime = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
-            logger.debug("SS Server time offset from UTC: %s", ServerTimeFromUTC)
-            logger.debug("SS Server time offset from UTC (seconds): %s", ServerTimeFromUTCSec)
-            logger.debug("SS twoWeeksAgo: %s", twoWeeksAgo)
-            if 'Furnace' in desired_plots:      ShowSSFurnace(conn)
-            if 'Temps' in desired_plots:        ShowSSTemps(conn)
-            if 'Hums' in desired_plots:         ShowSSHums(conn)
-
+    for k in desired_plots:
+        logger.info('             ##############   Preparing graph "%s"   #################' % k)
+        ShowGraph(GraphDefs[k])
 
 
 if __name__ == "__main__":

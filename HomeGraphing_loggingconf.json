@@ -49,7 +49,17 @@
     "loggers": {
         "__main__": {
             "level": "NOTSET",
-            "handlers": ["debugconsole", "debug_file_handler"],
+            "handlers": ["console", "debug_file_handler"],
+            "propagate": false
+        },
+        "myPalette": {
+            "level": "NOTSET",
+            "handlers": ["console", "debug_file_handler"],
+            "propagate": false
+        },
+        "GraphDefinitions": {
+            "level": "NOTSET",
+            "handlers": ["console", "debug_file_handler"],
             "propagate": false
         }
     },

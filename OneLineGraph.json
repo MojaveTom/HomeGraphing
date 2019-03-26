@@ -1,0 +1,45 @@
+{
+  "RCSolar": {
+    "GraphTitle": "Ridgecrest Solar",
+    "DBHost": "RC",
+    "outputFile": "RCSolar.htm",
+    "ShowGraph": true,
+    "XaxisTitle": "Date/Time",
+    "Yaxes": [
+      {
+        "title": "Watts"
+        , "color_map": "Dark2"
+      },
+      {
+        "title": "W/m^2"
+        , "color": "red"
+        , "color_map": "red"
+        , "location": "right"
+      }
+    ],
+    "items": [
+      {
+        "query": "SELECT Time AS 'Time', OutWattsNow AS 'North Array' FROM `{my_schema}`.`SolarEnergy` WHERE Name = 'North Array' AND Time > '%s' ORDER BY Time",
+        "variableNames": ["North Array"],
+        "datafile": "NorthArray.csv",
+        "axisNum": 0,
+        "dataname": "NORTH SOLAR"
+      },
+      {
+        "query": "SELECT Time AS 'Time', OutWattsNow AS 'South Array' FROM `{my_schema}`.`SolarEnergy` WHERE Name = 'South Array' AND Time > '%s' ORDER BY Time",
+        "variableNames": ["South Array"],
+        "datafile": "SouthArray.csv",
+        "axisNum": 0,
+        "dataname": "SOUTH SOLAR"
+      },
+      {
+        "query": "SELECT date AS 'Time', solarradiation as SolarRad FROM `{my_schema}`.`rcweather` WHERE date > '%s' ORDER BY date",
+        "variableNames": ["SolarRad"],
+        "datafile": "SolarRad.csv",
+        "axisNum": 1,
+        "dataname": "SOLAR RADIATION"
+      }
+    ]
+  }
+}
+  

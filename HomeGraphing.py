@@ -93,6 +93,7 @@ def GetConfigFilePath():
 
 #  global twoWeeksAgo, filePath
 DelOldCsv = False
+LocalDataOnly = False
 SaveCSVData = True  # Flags GetData function to save back to the CSV data file.
 BeginTime = None       # Number of days to plot
 DBHostDict = dict()
@@ -146,15 +147,20 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
     prevLogLevel = logger.getEffectiveLevel()
     # logger.setLevel('WARNING')
 
-    if (len(hostParams) == 0) or (dataTimeOffsetUTC is None): # no host params, don't try to do database stuff
+    if (len(hostParams) == 0) or (dataTimeOffsetUTC is None) or LocalDataOnly: # no host params, don't try to do database stuff
         logger.warning('hostParams dict is empty, or no dataTimeOffsetUTC given.  Do not access database.')
         query = None
-        DBConn = None
-    else:
-        beginDate = hostParams['BeginTime']
-        twoWeeksAgo = hostParams['twoWeeksAgo']
-        DBConn = hostParams['DBEngine'].connect()
-        DBConn.begin()
+
+    #  What to do if hostParams is empty??????????????? (Shouldn't happen)
+    beginDate = hostParams['BeginTime']
+    twoWeeksAgo = hostParams['twoWeeksAgo']
+    # use these commented out lines if the DBConn doesn't survive being in the hostParams dict.
+    # DBConn = hostParams['DBEngine'].connect()
+    # DBConn.begin()
+    DBConn = hostParams['conn']
+
+    slicer = 'index > "%s"'%(beginDate + dataTimeOffsetUTC).isoformat()     # pandas "query" to remove old data FROM csv data
+    logger.info('slicer = %s', slicer)
 
     SQLbeginDate = beginDate        # initial value; changed later if CSV data read
 
@@ -229,6 +235,8 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
         if DBConn and query:
             logger.info("CSV data is recent enough; don't query database. ")
             logger.debug("now %s SQLbeginDate %s diff %s", datetime.utcnow(), SQLbeginDate, (datetime.utcnow() - SQLbeginDate))
+        elif LocalDataOnly:
+            logger.debug('Using local data only; no database data desired.  No SQL data.')
         else:
             logger.debug('No database parameters defined; no SQL data.')
         data = fdata
@@ -241,8 +249,6 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
     # Only save two weeks of data in the CSV file
     if SaveCSVData: data.query('index > "%s"'% twoWeeksAgo.isoformat()).to_csv(theFile, index='Time')
 
-    slicer = 'index > "%s"'%(beginDate + dataTimeOffsetUTC).isoformat()     # pandas "query" to remove old data FROM csv data
-    logger.info('slicer = %s', slicer)
     logger.setLevel(prevLogLevel)
     return data.query(slicer)       # return data from beginDate to  present
 
@@ -379,7 +385,7 @@ def ShowGraph(graphDict):
     view(graphDict["outputFile"], new='tab')
 
 def main():
-    global DelOldCsv, SaveCSVData, DBHostDict
+    global DelOldCsv, SaveCSVData, DBHostDict, LocalDataOnly
 
     RCGraphs = {'RCSolar', 'RCLaundry', 'RCHums', 'RCTemps', 'RCWater', 'RCPower', 'RCHeaters'}
     SSGraphs = {'SSFurnace', 'SSTemps', 'SSHums'}
@@ -415,6 +421,7 @@ def main():
     parser.add_argument("-H", "--SSHumidities", dest="plots", action="append_const", const="SSHums", help="Show Steamboat Humidities graph.")
     parser.add_argument("-T", "--SSTemperatures", dest="plots", action="append_const", const="SSTemps", help="Show Steamboat Temperatures graph.")
     parser.add_argument("-v", "--verbosity", dest="verbosity", action="count", help="increase output verbosity", default=0)
+    parser.add_argument("--LocalDataOnly", dest="LocalOnly", action="store_true", help="Use only locally stored data for graphs; don't access remote databases.")
     parser.add_argument("--DeleteOldCSVData", dest="DeleteOld", action="store_true", help="Delete any existing CSV data for selected graphs before retrieving new.")
     parser.add_argument("--DontSaveCSVData", dest="DontSaveCSVdata", action="store_true", default=False, help="Do NOT save CSV data for selected graphs.")
     parser.add_argument("-g", "--graphs", dest="graphDefs", action="store", help="Name of graph definition file", default=defaultGraphsDefinitionFile)
@@ -422,11 +429,10 @@ def main():
     Verbosity = args.verbosity
     DelOldCsv = args.DeleteOld
     SaveCSVData = not args.DontSaveCSVdata
+    LocalDataOnly = args.LocalOnly
     numDays = float(args.days)
 
     desired_plots = set()
-    fap = itertools.chain.from_iterable(args.plots)
-    logger.debug('plots args --flattened-- is: "%s"' % fap)
     logger.debug('There are %s plot items specified on the command line.' % len(args.plots))
     for i in range(len(args.plots)):
         itm = args.plots[i]
@@ -492,8 +498,34 @@ def main():
     if len(GraphDefs) == 0:
         logger.warning('None of the desired plots are in the graph definitions file.')
         exit(3)
-    logger.info('DBHosts for this graph def file are: %s' % DBHosts)
-    # GraphDefs['_DBHosts'] = dict(zip(DBHosts, "a"*len(DBHosts)))
+    gdks = sorted(GraphDefs.keys())
+    logger.debug('Sorted list of graphs (from GraphDefs.keys): %s' % gdks)
+
+    logger.debug('GraphDefs dict is: %s' % json.dumps(GraphDefs, indent=2))
+    if LocalDataOnly:
+        ServerTimeFromUTC = datetime.utcnow() - datetime.now()      # Use current system as database host for time purposes.
+        for h in DBHosts:       # create "dummy" host entry
+            logger.debug('Creating "dummy" host entry for %s' % h)
+            DBHostDict[h] = dict()
+            dbhd = DBHostDict[h]
+            dbhd['DBEngine'] = None
+            dbhd['haschema'] = 'haschema'
+            dbhd['myschema'] = 'myschema'
+            dbhd['conn'] = None
+            dbhd['twoWeeksAgo'] = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=14))
+            dbhd['BeginTime'] = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
+            dbhd['ServerTimeFromUTC'] = ServerTimeFromUTC
+            logger.debug("%s Server time offset from UTC: %s" % (h, dbhd['ServerTimeFromUTC']))
+            logger.debug("%s BeginTime: %s" % (h, dbhd['BeginTime']))
+            logger.debug("%s twoWeeksAgo: %s" % (h, dbhd['twoWeeksAgo']))
+        # Datetime objects are not JSON serializable; don't dump host dict.
+        # logger.debug('Dummy DBHostDict is: %s' % json.dumps(DBHostDict, indent=2))
+        for k in gdks:
+            logger.info('             ##############   Preparing graph "%s"   #################' % k)
+            ShowGraph(GraphDefs[k])
+        logger.info('             ##############   All Done   #################')
+        return
+
     for h in DBHosts:
         DBHostDict[h] = dict()
         dbhd = DBHostDict[h]
@@ -526,15 +558,14 @@ def main():
             logger.debug("%s Server time offset from UTC: %s" % (h, dbhd['ServerTimeFromUTC']))
             logger.debug("%s BeginTime: %s" % (h, dbhd['BeginTime']))
             logger.debug("%s twoWeeksAgo: %s" % (h, dbhd['twoWeeksAgo']))
-
-    logger.debug('GraphDefs dict is: %s' % json.dumps(GraphDefs, indent=2))
-        # items in DBHostDict are not serializable, so can't dump them
+            for k in gdks:
+                gd = GraphDefs[k]
+                if gd["DBHost"] == h:
+                    logger.info('             ##############   Preparing graph "%s"   #################' % k)
+                    ShowGraph(GraphDefs[k])
+        # "DBEngine" and "conn" items in DBHostDict are not serializable, so can't dump them
     # logger.debug('DBHostDict is: %s' % json.dumps(DBHostDict, indent=2))
-
-    for k in desired_plots:
-        logger.info('             ##############   Preparing graph "%s"   #################' % k)
-        ShowGraph(GraphDefs[k])
-
+    logger.info('             ##############   All Done   #################')
 
 if __name__ == "__main__":
     main()

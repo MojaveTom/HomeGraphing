@@ -21,7 +21,7 @@ done
 
 ####   MAKE SURE THERE IS A LINK TO THE CURRENT EXECUTABLE -- not the .app
 #### WHERE THIS SCRIPT EXPECTS IT TO BE.
-$PWD/RetrieveAmbientWeatherData.py
+$PWD/RetrieveAmbientWeatherData.py >/dev/null 2>&1
 # Get time as num secs, round to next higher 15 minutes [add 3 min] (900 sec); print as HHMM
 nextTime=$(date -jr $(( ($(date -j +%s) / 900 + 1 ) * 900 + 180 )) "+%H%M")
 

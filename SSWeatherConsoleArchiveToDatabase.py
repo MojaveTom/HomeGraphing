@@ -97,6 +97,8 @@ def main():
     parser.add_argument("files", action="append", nargs="*", help="List of CSV files to process.")
     parser.add_argument("-b", "--beginTime", dest="begin", action="append", help="Beginning time(s) to insert data to database.")
     parser.add_argument("-e", "--endTime", dest="end", action="append", help="Ending time(s) to insert data to database.")
+    parser.add_argument("-g", "--maxGap", dest="maxGap", action="store", help="(minutes) Max gap in database data to ignore; gaps bigger that this will be filled in.", default='20')
+    parser.add_argument("-d", "--dryrun", dest="dryrun", action="store_true", help="Don't actually modify database.", default=False)
     parser.add_argument("-v", "--verbosity", dest="verbosity", action="count", help="increase output verbosity", default=0)
     args = parser.parse_args()
     # numDays = float(args.days)
@@ -150,6 +152,16 @@ def main():
     logger.info("schema %s"%(schema,))
     logger.info("Table %s"%(tableName,))
 
+    '''
+SQL commands to view gaps:
+
+create temporary table w1 like weather;
+alter table w1 drop primary key;
+alter table w1 add column id int auto_increment primary key first;
+insert into w1 (dateutc, tempinf, tempf, humidityin, humidity, windspeedmph, windgustmph, maxdailygust, winddir, baromabsin, baromrelin, hourlyrainin, dailyrainin, weeklyrainin, monthlyrainin, yearlyrainin, solarradiation, uv, feelsLike, dewPoint, lastRain, date) select * from weather order by date;
+select  wB.date as beginTime,  wA.date as endTime, round((wA.dateutc - wB.dateutc)/60000) as diff from w1 as wA inner join w1 as wB on wA.id=wB.id+1 where (wA.dateutc - wB.dateutc)/60000 > 20;
+drop table w1;
+    '''
     connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=schema)
     Eng = create_engine(connstr, echo = True if args.verbosity>=2 else False, logging_name = logger.name)
     logger.debug(Eng)
@@ -164,15 +176,15 @@ def main():
             conn.execute('alter table w1 add column id int auto_increment primary key first')
             logger.debug('Copy rows from weather to temporary table.')
             conn.execute('insert into w1 (dateutc, tempinf, tempf, humidityin, humidity, windspeedmph, windgustmph, maxdailygust, winddir, baromabsin, baromrelin, hourlyrainin, dailyrainin, weeklyrainin, monthlyrainin, yearlyrainin, solarradiation, uv, feelsLike, dewPoint, lastRain, date) select * from weather order by date')
-            logger.debug('Select time gaps.')
-            result = conn.execute('select  wB.date as beginTime,  wA.date as endTime, timestampdiff(minute, wB.date, wA.date) as diff from w1 as wA inner join w1 as wB on wA.id=wB.id+1 where timestampdiff(minute, wB.date, wA.date) > 20')
+            gapQuery = 'select  wB.date as beginTime,  wA.date as endTime, round((wA.dateutc - wB.dateutc)/60000) as diff from w1 as wA inner join w1 as wB on wA.id=wB.id+1 where (wA.dateutc - wB.dateutc)/60000 > %s'%args.maxGap
+            logger.debug('Select time gaps with query: "%s"'%gapQuery)
+            result = conn.execute(gapQuery)
             for row in result:
                 b = row[0]
-                logger.debug('Appending %s to beginTimes'%b)
-                beginTimes.append(b)
                 e = row[1]
-                logger.debug('Appending %s to endTimes'%e)
+                beginTimes.append(b)
                 endTimes.append(e)
+                logger.debug('Appending %s to beginTimes, %s to endTimes, because the gap was %s'%(b, e, row[2]))
             logger.debug('Auto detected gaps are: begin %s, end %s'%(beginTimes, endTimes))
             logger.debug('Drop temporary table.')
             conn.execute('drop table w1')
@@ -180,7 +192,7 @@ def main():
         insertQuery = 'INSERT IGNORE INTO ' + tableName + '(dateutc, date, tempinf, humidityin, tempf, humidity, windspeedmph, windgustmph,\
             dewPoint, feelsLike, winddir, baromabsin, baromrelin, hourlyrainin, dailyrainin, weeklyrainin, monthlyrainin, \
             yearlyrainin, solarradiation, uv) VALUES \n'
-        linebegin = '('
+        linebegin = '  ('
         logger.debug('zipped times: %s'%list(zip(beginTimes, endTimes)))
         for beginTime, endTime in list(zip(beginTimes, endTimes)):
             logger.debug('Scanning files for entries between "%s" and "%s"'%(beginTime, endTime))
@@ -210,7 +222,10 @@ def main():
         logger.debug('Insert the values.')
         insertQuery += ' ON DUPLICATE KEY UPDATE date=value(date)'
         logger.debug('The insert query is: "%s"'%insertQuery)
-        conn.execute(insertQuery)
+        if not args.dryrun:
+            conn.execute(insertQuery)
+        else:
+            logger.warning("Didn't actually modify database.")
         pass
     logger.info('             ##############   All Done   #################')
 

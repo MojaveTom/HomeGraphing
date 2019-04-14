@@ -193,6 +193,7 @@ drop table w1;
             dewPoint, feelsLike, winddir, baromabsin, baromrelin, hourlyrainin, dailyrainin, weeklyrainin, monthlyrainin, \
             yearlyrainin, solarradiation, uv) VALUES \n'
         linebegin = '  ('
+        valuesCount = 0
         logger.debug('zipped times: %s'%list(zip(beginTimes, endTimes)))
         for beginTime, endTime in list(zip(beginTimes, endTimes)):
             logger.debug('Scanning files for entries between "%s" and "%s"'%(beginTime, endTime))
@@ -208,9 +209,9 @@ drop table w1;
                         if printFirstTime:
                             logger.debug('First time in file is %s'%dt.isoformat())
                             printFirstTime = False
-                        if dt < beginTime:
+                        if dt <= beginTime:
                             continue
-                        if dt > endTime:
+                        if dt >= endTime:
                             break
                         lineCount += 1
                         fields[1] = dt.isoformat()
@@ -219,12 +220,16 @@ drop table w1;
                         insertQuery += ol
                     logger.debug('Last time in file is %s'%dt.isoformat())
                     logger.debug('There were %s lines in the file within the desired times.'%lineCount)
+                    valuesCount += lineCount
         logger.debug('Insert the values.')
         insertQuery += ' ON DUPLICATE KEY UPDATE date=value(date)'
+        logger.debug('All together, there were %s values to add to the database.'%valuesCount)
         logger.debug('The insert query is: "%s"'%insertQuery)
-        if not args.dryrun:
+        if (not args.dryrun) and (valuesCount > 0):
             conn.execute(insertQuery)
         else:
+            if valuesCount == 0:
+                logger.warning('No data found to update database.')
             logger.warning("Didn't actually modify database.")
         pass
     logger.info('             ##############   All Done   #################')

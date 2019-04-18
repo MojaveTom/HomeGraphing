@@ -89,7 +89,7 @@ def GetConfigFilePath():
             sys.exit(1)
     logger.info('Using configuration file at: %s', fp)
     return fp
-    
+
 
 #  global twoWeeksAgo, filePath
 DelOldCsv = False
@@ -178,7 +178,7 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
             fdata = pd.read_csv(theFile, index_col=0, parse_dates=True)
             logger.debug('Num Points from CSV = %s', fdata.size)
             if (fdata.size <= 0):
-                logger.info("CSV file exists but has no data.") 
+                logger.info("CSV file exists but has no data.")
                 fdata = None
             elif (beginDate is not None) and (fdata.index[0] > beginDate):
                 logger.debug("CSV data all more recent than desired data; ignore it.")
@@ -270,7 +270,7 @@ def ShowGraph(graphDict):
 
     # Signal that we want to reference local files for html output.
     res = Resources(mode='absolute')
-    
+
     # output_file(graphDict["outputFile"], title=graphDict['GraphTitle'])
 
     plot = figure(title=graphDict['GraphTitle']
@@ -293,12 +293,12 @@ def ShowGraph(graphDict):
     legend = Legend()
     # legend.items = [LegendItem(label="--- Left Axis ---"   , renderers=[])]
     legend.items = []
-    
+
     #########   Setup Y axes
     ## Colors
     plot.yaxis.visible = False
     extra_y_ranges = {}
-    
+
     for i in range(len(graphDict['Yaxes'])):
         ya = graphDict['Yaxes'][i]
         eyrName = 'Y%s_axis' % i
@@ -376,7 +376,7 @@ def ShowGraph(graphDict):
                 'Time' : 'datetime' # use 'datetime' formatter for 'x' field
                                         # use default 'numeral' formatter for other fields
             }))
-    
+
     # show(plot)
     html = file_html(plot, res, graphDict['GraphTitle'])
     f = open(graphDict["outputFile"], mode='w')
@@ -388,8 +388,8 @@ def main():
     global DelOldCsv, SaveCSVData, DBHostDict, LocalDataOnly
 
     RCGraphs = {'RCSolar', 'RCLaundry', 'RCHums', 'RCTemps', 'RCWater', 'RCPower', 'RCHeaters'}
-    SSGraphs = {'SSFurnace', 'SSTemps', 'SSHums'}
- 
+    SSGraphs = {'SSFurnace', 'SSTemps', 'SSHums', 'SSMotion'}
+
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
     configFile = GetConfigFilePath()
     configFileDir = os.path.dirname(configFile)
@@ -420,6 +420,7 @@ def main():
     parser.add_argument("-F", "--SSFurnace", dest="plots", action="append_const", const="SSFurnace", help="Show Steamboat Furnace graph.")
     parser.add_argument("-H", "--SSHumidities", dest="plots", action="append_const", const="SSHums", help="Show Steamboat Humidities graph.")
     parser.add_argument("-T", "--SSTemperatures", dest="plots", action="append_const", const="SSTemps", help="Show Steamboat Temperatures graph.")
+    parser.add_argument("-M", "--SSMotion", dest="plots", action="append_const", const="SSMotion", help="Show Steamboat Motions graph.")
     parser.add_argument("-v", "--verbosity", dest="verbosity", action="count", help="increase output verbosity", default=0)
     parser.add_argument("--LocalDataOnly", dest="LocalOnly", action="store_true", help="Use only locally stored data for graphs; don't access remote databases.")
     parser.add_argument("--DeleteOldCSVData", dest="DeleteOld", action="store_true", help="Delete any existing CSV data for selected graphs before retrieving new.")

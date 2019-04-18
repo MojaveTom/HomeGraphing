@@ -37,6 +37,9 @@ class Palette(object):
         _num = num
         if _num is None or _num < 1: _num = 8
         pf = all_palettes[colorName]
+        # if _num > max(pf.keys()):
+        #     logger.debug('The number of lines in the graph exceeds the number of colors in the palette.  Switch to a larger palette.')
+        #     pf = all_palettes['Viridis']
         pfk = pf.keys()
         if _num in pfk:
             self._Palette = pf[_num]
@@ -44,7 +47,10 @@ class Palette(object):
             return
         maxp = max(pfk)
         rptcnt = ((_num-1) // maxp) + 1
-        minContainPalette = min(list(it.filterfalse(lambda x: x<_num, pfk)))
+        if _num > maxp:
+            minContainPalette = maxp
+        else:
+            minContainPalette = min(list(it.filterfalse(lambda x: x<_num, pfk)))
         if rptcnt == 1:
             self._Palette = linear_palette(pf[minContainPalette], _num)
         else:

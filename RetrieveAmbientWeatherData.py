@@ -10,15 +10,13 @@
 
 '''
 
-from sqlalchemy import create_engine
-from sqlalchemy import sql, exc
 import pymysql as mysql
-import pymysql.err as Error
+from pymysql.err import Error as DbError
 import time
 import datetime
 from datetime import date
 from datetime import timedelta
-from datetime import datetime
+from datetime import datetime as dt
 import os
 import argparse
 import sys
@@ -28,6 +26,9 @@ import logging
 import logging.config
 import logging.handlers
 import json
+from ambient_api import ambientapi
+from math import ceil as ceil
+
 
 ProgName, ext = os.path.splitext(os.path.basename(sys.argv[0]))
 ProgPath = os.path.dirname(os.path.realpath(sys.argv[0]))
@@ -64,33 +65,78 @@ def GetConfigFilePath():
             sys.exit(1)
     logger.info('Using configuration file at: %s', fp)
     return fp
-    
-from ambient_api import ambientapi
 
 #######################   GLOBALS   ########################
 ServerTimeFromUTC = timedelta(hours=0)
 RequiredConfigParams = frozenset(('ambient_endpoint', 'ambient_api_key', 'ambient_application_key', 'inserter_host', 'inserter_schema', 'inserter_port', 'inserter_user', 'inserter_password', 'weather_table'))
 
+DBConn = None
+dontWriteDb = True
+tzsavesql = "SET @oldtz=@@session.time_zone"
+tzsetUTC  = "SET @@session.time_zone='+00:00'"
+tzrestoresql = "SET @@session.time_zone=@oldtz"
+logger.debug('tzsavesql: %s', tzsavesql)
+logger.debug('tzsetUTC: %s', tzsetUTC)
+logger.debug('tzrestoresql: %s', tzrestoresql)
+
+#  Generate a timezone for  LocalStandardTime
+#  Leaving off zone name from timezone creator generates UTC based name which may be more meaningful.
+localStandardTimeZone = datetime.timezone(-datetime.timedelta(seconds=time.timezone))
+logger.debug('LocalStandardTime ZONE is: %s'%localStandardTimeZone)
+
+
+#######################   FUNCTIONS   ########################
+
+def GetDatabaseHoles(conn, Table, HoleSize):
+    '''
+SQL commands to view gaps:
+
+create temporary table w1 like weather;
+alter table w1 drop primary key;
+alter table w1 add column id int auto_increment primary key first;
+insert into w1 (dateutc, tempinf, tempf, humidityin, humidity, windspeedmph, windgustmph, maxdailygust, winddir, baromabsin, baromrelin, hourlyrainin, dailyrainin, weeklyrainin, monthlyrainin, yearlyrainin, solarradiation, uv, feelsLike, dewPoint, lastRain, date) select * from weather order by date;
+select  wB.date as beginTime,  wA.date as endTime, round((wA.dateutc - wB.dateutc)/60000) as diff from w1 as wA inner join w1 as wB on wA.id=wB.id+1 where (wA.dateutc - wB.dateutc)/60000 > 20;
+drop table w1;
+'''
+    beginTimes = list()
+    endTimes = list()
+    logger.debug('Auto detecting gaps in weather table.')
+    logger.debug('Create temporary table.  "%s"'%conn.mogrify('create temporary table w1 like %s'%Table))
+    conn.execute('create temporary table w1 like %s'%Table)
+    logger.debug('Drop primary key on temporary table.')
+    conn.execute('alter table w1 drop primary key')
+    logger.debug('Add id column to temporary table.')
+    conn.execute('alter table w1 add column id int auto_increment primary key first')
+    logger.debug('Copy rows from weather to temporary table.')
+    conn.execute('insert into w1 (dateutc, tempinf, tempf, humidityin, humidity, windspeedmph, windgustmph, maxdailygust, winddir, baromabsin, baromrelin, hourlyrainin, dailyrainin, weeklyrainin, monthlyrainin, yearlyrainin, solarradiation, uv, feelsLike, dewPoint, lastRain, date) select * from %s order by date'%Table)
+    gapQuery = 'select  wB.dateutc,  wA.dateutc, round((wA.dateutc - wB.dateutc)/60000), wB.date, wA.date from w1 as wA inner join w1 as wB on wA.id=wB.id+1 where (wA.dateutc - wB.dateutc)/60000 > %s'%HoleSize
+    logger.debug('Select time gaps with query: "%s"'%gapQuery)
+    conn.execute(gapQuery)
+    for row in conn:
+        b = row[0]
+        e = row[1]
+        beginTimes.append(b)
+        endTimes.append(e)
+        logger.debug('Appending %s to beginTimes, %s to endTimes, because the gap was %s'%(row[3], row[4], row[2]))
+    logger.debug('Auto detected gaps are: begin %s, end %s'%(beginTimes, endTimes))
+    logger.debug('Drop temporary table.')
+    conn.execute('drop table w1')
+
+    return beginTimes, endTimes
+
 def main():
+    global DBConn, dontWriteDb, localStandardTimeZone
     logger.debug("Entered main.")
     parser = argparse.ArgumentParser(
         description='Retrieve weather data from Ambient.net.')
     parser.add_argument("-o", "--oldData", dest="desiredFirst", action="store", help="Set desired first database date.")
+    parser.add_argument("-s", "--holeSize", dest="holeSize", action="store", help="If specified, look for holes in weather data bigger than this AND try to fill them.")
+    parser.add_argument("-W", "--dontWriteToDB", dest="noWriteDb", action="store_true", default=False, help="Don't write to database [during debug defaults to True].")
     parser.add_argument("-v", "--verbosity", dest="verbosity",
                         action="count", help="Increase output verbosity", default=0)
     args = parser.parse_args()
     Verbosity = args.verbosity
-    firstDate = None
-    if args.desiredFirst is not None:
-        try:
-            firstDate = datetime.fromisoformat(args.desiredFirst)
-            logger.info("Desired first date is: %s", str(firstDate))
-        except Exception as e:
-            logger.error("Old data retrieval aborted because given time was ill-formatted.")
-            logger.info("--oldData time was specified as: %s", args.desiredFirst)
-            logger.exception(e)
-    else:
-        logger.info("No historical weather data desired.")
+    dontWriteDb = args.noWriteDb
 
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
     configFile = GetConfigFilePath()
@@ -110,7 +156,7 @@ def main():
     user = cfg['inserter_user']
     pwd  = cfg['inserter_password']
     host = cfg['inserter_host']
-    port = cfg['inserter_port']
+    port = int(cfg['inserter_port'])
     myschema = cfg['inserter_schema']
     endpoint = cfg['ambient_endpoint']
     api_key = cfg['ambient_api_key']
@@ -118,11 +164,12 @@ def main():
     weather_table = cfg['weather_table']
     myWeatherDevice = cfg['MAC_address']
 
-    connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=myschema)
-    logger.info("SS weather database connection string: %s", connstr)
-    InserterEng = create_engine(connstr, echo = True if Verbosity>=1 else False, logging_name = logger.name)
-    logger.info(InserterEng)
-    with InserterEng.connect() as Iconn, Iconn.begin():
+    logger.debug('host: %s, port: %d, user: %s, pwd: %s, schema: %s'%(host, port, user, pwd, myschema))
+
+    DBConn = mysql.connect(host=host, port=port, user=user, password=pwd, database=myschema, binary_prefix=True, charset='utf8mb4')
+    logger.debug('DBConn is: %s'%DBConn)
+
+    with DBConn.cursor() as Iconn:
         logger.info("Insertion connection to database established.")
         Ambient_api = ambientapi.AmbientAPI(AMBIENT_ENDPOINT=endpoint \
             , AMBIENT_API_KEY=api_key \
@@ -149,51 +196,53 @@ def main():
             logger.critical('Desired weather station data not found at AmbientWeather. %s' % myWeatherDevice)
             exit(1)
 
-        result = Iconn.execute("SELECT date FROM `"+myschema+"`.`"+weather_table+"` ORDER BY date DESC LIMIT 2")
+        Iconn.execute("SELECT date FROM `"+myschema+"`.`"+weather_table+"` ORDER BY date DESC LIMIT 2")
         lastTimeInDb = None
         nextToLastTime = None
-        for r in result:
-            if lastTimeInDb is None: lastTimeInDb = r[0]
+        for result in Iconn:
+            if lastTimeInDb is None: lastTimeInDb = result[0]
             elif nextToLastTime is None:
-                nextToLastTime = r[0]
+                nextToLastTime = result[0]
                 break
         logger.debug('lastTimeInDb: %s, nextToLastTime: %s', lastTimeInDb, nextToLastTime)
-        result = Iconn.execute("SELECT date FROM `"+myschema+"`.`"+weather_table+"` ORDER BY date LIMIT 1")
+        Iconn.execute("SELECT dateutc FROM `"+myschema+"`.`"+weather_table+"` ORDER BY date LIMIT 1")
         firstTimeInDb = None
-        for r in result:
-            firstTimeInDb = r[0]
-        logger.debug('firstTimeInDb: %s', firstTimeInDb)
+        for result in Iconn:
+            firstTimeInDb = result[0]
+        logger.debug('firstTimeInDb: %s ms', firstTimeInDb)
         if lastTimeInDb and nextToLastTime:
             timeDiff = lastTimeInDb - nextToLastTime
         else:
             timeDiff = timedelta(minutes=5)
-        nowTime = datetime.now()
+        if timeDiff > timedelta(minutes=5):
+            timeDiff = timedelta(minutes=5)
+        nowTime = dt.now()
         if lastTimeInDb:
-            numNew = int((nowTime - lastTimeInDb) / timeDiff)
+            numNew = int((nowTime - lastTimeInDb) / timeDiff) + 2    # Get a couple duplicates "just in case"
         else:
-            numNew = 288
+            numNew = 288        # This only happens if nothing in database.
         logger.info("lastTimeInDb: %s; nextToLastTime: %s; timeDiff: %s", lastTimeInDb, nextToLastTime, timeDiff)
         logger.info("nowTime: %s", nowTime)
-        logger.info("Number of new data points is: %s", numNew)
+        logger.info("Number of new data points is (plus extras): %s", numNew)
 
-        tzsavesql = "SET @oldtz=@@session.time_zone"
-        tzsetUTC  = "SET @@session.time_zone='+00:00'"
-        tzrestoresql = "SET @@session.time_zone=@oldtz"
-        logger.debug('tzsavesql: %s', tzsavesql)
-        logger.debug('tzsetUTC: %s', tzsetUTC)
-        logger.debug('tzrestoresql: %s', tzrestoresql)
+        ## Set time zone for my connection to UTC, so times from ambient will be correct.
         try:
-            result = Iconn.execute(tzsavesql)
-            result = Iconn.execute(tzsetUTC)
-        except exc.DBAPIError as e:
+            Iconn.execute(tzsavesql)
+            Iconn.execute(tzsetUTC)
+        except DbError as e:
             _ = e
-            logger.error("Caught DBAPIError exception settinmg time_zone: %s", e)
+            logger.error("Caught DbError exception settinmg time_zone: %s", e)
             logger.exception(e)
+            DBConn.rollback()
             pass
 
         time.sleep(2)       # Wait a while for Ambient server to recover: at least 1 sec.
 
-        wdata = device.get_data(limit=numNew+2)     # Get a couple duplicates "just in case"
+        logger.debug('Get %s data points from Ambient Weather.'%str(numNew))
+
+        ################    get data from Ambient
+        wdata = device.get_data(limit=numNew)
+
         if len(wdata) > 0:
             logger.debug("Length, type of weather device data: %s, %s, %s", len(wdata), type(wdata), type(wdata[0]))
             logger.info("Weather device data: %s", wdata)
@@ -201,22 +250,69 @@ def main():
                 insertsql = "INSERT IGNORE INTO `"+myschema+"`.`"+weather_table+"` "+str(tuple(dp.keys())).replace("'", "") \
                     +" VALUES "+str(tuple(dp.values())).replace("Z","")+" ON DUPLICATE KEY UPDATE date = VALUES(date)"
                 logger.debug("Insert SQL: %s", insertsql)
-                try:
-                    Iconn.execute(insertsql)
-                except exc.DBAPIError as e:
-                    _ = e
-                    logger.warning("Caught DBAPIError exception inserting data: %s", e)
-                    logger.exception(e)
-                    pass
+                if not dontWriteDb:
+                    try:
+                        Iconn.execute(insertsql)
+                    except DbError as e:
+                        _ = e
+                        logger.warning("Caught DbError exception inserting data: %s", e)
+                        logger.exception(e)
+                        DBConn.rollback()
+                        break
+                else:
+                    logger.debug('Did NOT write to database.')
         else:
             logger.info("No new weather data retrieved.")
 
-        if (firstDate is not None) and (firstTimeInDb is not None) and (firstDate >= firstTimeInDb):
-            logger.info("Database already has desired historical data.")
-        elif (firstDate is not None) and (firstTimeInDb is not None) and (firstDate < firstTimeInDb):
-            logger.info("Trying to retrieve historical weather data before: %s back to: %s", firstTimeInDb, firstDate)
-            time.sleep(2)       # wait for ambient serv er to recover
-            wdata = device.get_data(end_date = firstTimeInDb)
+        beginTime = round(datetime.datetime.utcnow().timestamp()*1000) # number millisec since Epoch
+        endTime = beginTime
+        beginTimes = list()
+        endTimes = list()
+
+        holeSize = None
+        if args.holeSize is not None:
+            if int(args.holeSize) < 5:
+                logger.warning('Hole size must be larger than 5 min.  You specifiec: %s.'%args.holeSize)
+                logger.warning('Ignoring hole filling.')
+                holeSize = None
+            else:
+                holeSize = int(args.holeSize)
+
+        #####  Find holes
+        if holeSize is not None:
+            logger.debug('Looking for holes in the weather data larger that %s min.'%holeSize)
+            beginTimes, endTimes = GetDatabaseHoles(Iconn, weather_table, holeSize)
+            logger.debug('Hole begins, ends %s'%list(zip(beginTimes, endTimes)))
+
+        firstDate = None
+        if args.desiredFirst is not None:
+            try:
+                firstDate = dt.fromisoformat(args.desiredFirst).timestamp()*1000        # millisec since epoch
+                logger.info("Desired first date is: %s ms", str(firstDate))
+            except Exception as e:
+                logger.error("Old data retrieval aborted because given time was ill-formatted.")
+                logger.info("--oldData time was specified as: %s", args.desiredFirst)
+                logger.exception(e)
+        else:
+            logger.info("No weather data before existing is desired.")
+
+        if (firstDate is not None) and (firstTimeInDb is not None) and (firstDate < firstTimeInDb):
+            beginTimes.append(firstDate)
+            endTimes.append(firstTimeInDb)
+            pass
+        for beginTime, endTime in list(zip(beginTimes, endTimes)):
+            logger.info("Trying to retrieve historical weather data between: %s and: %s", beginTime, endTime)
+            time.sleep(2)       # wait for ambient server to recover
+            timeDiffMilliSec = round(timeDiff.total_seconds()*1000)
+            numReq = ceil((endTime - beginTime) / timeDiffMilliSec) + 2
+            endTime = endTime + timeDiffMilliSec        # overlap the ends of the gap by 1 point.
+            if numReq > 288:
+                numReq = 288
+            logger.debug('Getting %s records ending at %s ms'%(numReq, endTime))
+
+            #########   Get weather data from Ambient
+            wdata = device.get_data(limit = numReq, end_date = endTime)
+
             if len(wdata) > 0:
                 logger.debug("Length, type of weather device data: %s, %s, %s", len(wdata), type(wdata), type(wdata[0]))
                 logger.info("Weather device data: %s", wdata)
@@ -227,22 +323,55 @@ def main():
                             + str(tuple(dp.values())).replace("Z","") \
                             + " ON DUPLICATE KEY UPDATE date = VALUES(date)"
                     logger.debug("Insert SQL: %s", insertsql)
-                    try:
-                        Iconn.execute(insertsql)
-                    except exc.DBAPIError as e:
-                        _ = e
-                        logger.warning("Caught DBAPIError exception inserting data: %s", e)
-                        logger.exception(e)
+                    if not dontWriteDb:
+                        try:
+                            Iconn.execute(insertsql)
+                        except DbError as e:
+                            _ = e
+                            logger.warning("Caught DbError exception inserting data: %s", e)
+                            logger.exception(e)
+                            DBConn.rollback()
+                            break
+                    else:
+                        logger.debug('Did NOT write to database.')
             else:
                 logger.info("No historical data retrieved.")
 
+        #####  Find unfillable holes -- that is holes that couldn't be filled from above
+        if holeSize is not None:
+            logger.debug('Looking for UNFILLED holes in the weather data larger that %s min.'%holeSize)
+            beginTimes, endTimes = GetDatabaseHoles(Iconn, weather_table, holeSize)
+            logger.debug('Hole begins, ends %s'%list(zip(beginTimes, endTimes)))
+        for beginTime, endTime in list(zip(beginTimes, endTimes)):
+            logger.info("Filling weather data between: %s and: %s with NULLs", beginTime, endTime)
+            timeDiffMilliSec = 5*60*1000       # 5 minutes as millisec
+            for theTime in range(beginTime, endTime, timeDiffMilliSec):
+                theDate = datetime.datetime.utcfromtimestamp(theTime/1000).isoformat(sep=' ')
+                insertsql = "INSERT IGNORE INTO `{schema}`.`{table}` (dateutc, date) VALUES (%d, '%s') ON DUPLICATE KEY UPDATE date = VALUES(date)".format(schema=myschema, table=weather_table)
+                logger.debug("Insert SQL: %s", Iconn.mogrify(insertsql%(theTime, theDate)))
+                if not dontWriteDb:
+                    try:
+                        Iconn.execute(insertsql%(theTime, theDate))
+                    except DbError as e:
+                        _ = e
+                        logger.warning("Caught DbError exception inserting data: %s", e)
+                        logger.exception(e)
+                        DBConn.rollback()
+                        break
+                else:
+                    logger.debug('Did NOT write to database.')
+
         try:
-            result = Iconn.execute(tzrestoresql)
-        except exc.DBAPIError as e:
+            Iconn.execute(tzrestoresql)
+            # DBConn.commit()
+        except DbError as e:
             _ = e
-            logger.warning("Caught DBAPIError exception inserting data: %s", e)
+            logger.warning("Caught DbError exception restoring timezone: %s", e)
             logger.exception(e)
+            DBConn.rollback()
             pass
+        DBConn.commit()
+    logger.info('             ##############   RetrieveAmbiendWeatherData --- All Done ---  #################')
 
 if __name__ == "__main__":
     main()

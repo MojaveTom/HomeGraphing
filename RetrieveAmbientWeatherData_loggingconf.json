@@ -52,6 +52,11 @@
             "level": "NOTSET",
             "handlers": ["console", "debug_file_handler"],
             "propagate": false
+        },
+        "urllib3.connectionpool": {
+            "level": "NOTSET",
+            "handlers": ["console", "debug_file_handler"],
+            "propagate": false
         }
     },
 

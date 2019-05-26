@@ -94,22 +94,19 @@ SQL commands to view gaps:
 create temporary table w1 like weather;
 alter table w1 drop primary key;
 alter table w1 add column id int auto_increment primary key first;
-insert into w1 (dateutc, tempinf, tempf, humidityin, humidity, windspeedmph, windgustmph, maxdailygust, winddir, baromabsin, baromrelin, hourlyrainin, dailyrainin, weeklyrainin, monthlyrainin, yearlyrainin, solarradiation, uv, feelsLike, dewPoint, lastRain, date) select * from weather order by date;
+insert into w1 (dateutc, date) select dateutc, date from weather order by dateutc;
 select  wB.date as beginTime,  wA.date as endTime, round((wA.dateutc - wB.dateutc)/60000) as diff from w1 as wA inner join w1 as wB on wA.id=wB.id+1 where (wA.dateutc - wB.dateutc)/60000 > 20;
 drop table w1;
 '''
     beginTimes = list()
     endTimes = list()
     logger.debug('Auto detecting gaps in weather table.')
-    logger.debug('Create temporary table.  "%s"'%conn.mogrify('create temporary table w1 like %s'%Table))
-    conn.execute('create temporary table w1 like %s'%Table)
-    logger.debug('Drop primary key on temporary table.')
-    conn.execute('alter table w1 drop primary key')
-    logger.debug('Add id column to temporary table.')
-    conn.execute('alter table w1 add column id int auto_increment primary key first')
+    q = 'CREATE TEMPORARY TABLE w1 (id BIGINT AUTO_INCREMENT PRIMARY KEY, dateutc BIGINT, date DATETIME)'
+    logger.debug('Create temporary table.  "%s"'%q)
+    conn.execute(q)
     logger.debug('Copy rows from weather to temporary table.')
-    conn.execute('insert into w1 (dateutc, tempinf, tempf, humidityin, humidity, windspeedmph, windgustmph, maxdailygust, winddir, baromabsin, baromrelin, hourlyrainin, dailyrainin, weeklyrainin, monthlyrainin, yearlyrainin, solarradiation, uv, feelsLike, dewPoint, lastRain, date) select * from %s order by date'%Table)
-    gapQuery = 'select  wB.dateutc,  wA.dateutc, round((wA.dateutc - wB.dateutc)/60000), wB.date, wA.date from w1 as wA inner join w1 as wB on wA.id=wB.id+1 where (wA.dateutc - wB.dateutc)/60000 > %s'%HoleSize
+    conn.execute('INSERT INTO w1 (dateutc, date) SELECT dateutc, date FROM %s ORDER BY dateutc'%Table)
+    gapQuery = 'SELECT  wB.dateutc,  wA.dateutc, ROUND((wA.dateutc - wB.dateutc)/60000), wB.date, wA.date FROM w1 AS wA INNER JOIN w1 AS wB ON wA.id=wB.id+1 WHERE (wA.dateutc - wB.dateutc)/60000 > %s'%HoleSize
     logger.debug('Select time gaps with query: "%s"'%gapQuery)
     conn.execute(gapQuery)
     for row in conn:

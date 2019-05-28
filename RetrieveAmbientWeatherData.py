@@ -128,6 +128,7 @@ def main():
         description='Retrieve weather data from Ambient.net.')
     parser.add_argument("-o", "--oldData", dest="desiredFirst", action="store", help="Set desired first database date.")
     parser.add_argument("-s", "--holeSize", dest="holeSize", action="store", help="If specified, look for holes in weather data bigger than this AND try to fill them.")
+    parser.add_argument("-n", "--nullHoles", dest="doNull", action="store_true", help="Fill remaining holes with NULL records so hole won't be found again.")
     parser.add_argument("-W", "--dontWriteToDB", dest="noWriteDb", action="store_true", default=False, help="Don't write to database [during debug defaults to True].")
     parser.add_argument("-v", "--verbosity", dest="verbosity",
                         action="count", help="Increase output verbosity", default=0)
@@ -335,28 +336,28 @@ def main():
                 logger.info("No historical data retrieved.")
 
         #####  Find unfillable holes -- that is holes that couldn't be filled from above
-        if holeSize is not None:
+        if (args.doNull) and (holeSize is not None):
             logger.debug('Looking for UNFILLED holes in the weather data larger that %s min.'%holeSize)
             beginTimes, endTimes = GetDatabaseHoles(Iconn, weather_table, holeSize)
             logger.debug('Hole begins, ends %s'%list(zip(beginTimes, endTimes)))
-        for beginTime, endTime in list(zip(beginTimes, endTimes)):
-            logger.info("Filling weather data between: %s and: %s with NULLs", beginTime, endTime)
-            timeDiffMilliSec = 5*60*1000       # 5 minutes as millisec
-            for theTime in range(beginTime, endTime, timeDiffMilliSec):
-                theDate = datetime.datetime.utcfromtimestamp(theTime/1000).isoformat(sep=' ')
-                insertsql = "INSERT IGNORE INTO `{schema}`.`{table}` (dateutc, date) VALUES (%d, '%s') ON DUPLICATE KEY UPDATE date = VALUES(date)".format(schema=myschema, table=weather_table)
-                logger.debug("Insert SQL: %s", Iconn.mogrify(insertsql%(theTime, theDate)))
-                if not dontWriteDb:
-                    try:
-                        Iconn.execute(insertsql%(theTime, theDate))
-                    except DbError as e:
-                        _ = e
-                        logger.warning("Caught DbError exception inserting data: %s", e)
-                        logger.exception(e)
-                        DBConn.rollback()
-                        break
-                else:
-                    logger.debug('Did NOT write to database.')
+            for beginTime, endTime in list(zip(beginTimes, endTimes)):
+                logger.info("Filling weather data between: %s and: %s with NULLs", beginTime, endTime)
+                timeDiffMilliSec = 5*60*1000       # 5 minutes as millisec
+                for theTime in range(beginTime, endTime, timeDiffMilliSec):
+                    theDate = datetime.datetime.utcfromtimestamp(theTime/1000).isoformat(sep=' ')
+                    insertsql = "INSERT IGNORE INTO `{schema}`.`{table}` (dateutc, date) VALUES (%d, '%s') ON DUPLICATE KEY UPDATE date = VALUES(date)".format(schema=myschema, table=weather_table)
+                    logger.debug("Insert SQL: %s", Iconn.mogrify(insertsql%(theTime, theDate)))
+                    if not dontWriteDb:
+                        try:
+                            Iconn.execute(insertsql%(theTime, theDate))
+                        except DbError as e:
+                            _ = e
+                            logger.warning("Caught DbError exception inserting data: %s", e)
+                            logger.exception(e)
+                            DBConn.rollback()
+                            break
+                    else:
+                        logger.debug('Did NOT write to database.')
 
         try:
             Iconn.execute(tzrestoresql)
@@ -368,8 +369,10 @@ def main():
             DBConn.rollback()
             pass
         DBConn.commit()
-    logger.info('             ##############   RetrieveAmbiendWeatherData --- All Done ---  #################')
 
 if __name__ == "__main__":
+    logger.info('             ##############   RetrieveAmbiendWeatherData --- Starting ---  #################')
     main()
+    logger.info('             ##############   RetrieveAmbiendWeatherData --- All Done ---  #################')
+    logging.shutdown()
     pass

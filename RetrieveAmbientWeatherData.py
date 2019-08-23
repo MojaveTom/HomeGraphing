@@ -20,7 +20,6 @@ from datetime import datetime as dt
 import os
 import argparse
 import sys
-import time
 import configparser
 import logging
 import logging.config

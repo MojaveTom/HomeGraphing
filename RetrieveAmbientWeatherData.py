@@ -8,6 +8,9 @@
 # Probably should run a cron job every 12 hours to get the previous 24 hours of data
 #  and let the database sort out the duplicates.
 
+Use the following command from bash in this directory to install this program to run every 900 seconds (15 minutes)
+../MqttUtils/InstallAgent.py --IAa '[{"StartInterval": 900}]' RetrieveAmbientWeatherData.py
+
 '''
 ### Python3 Library documentation   #   https://docs.python.org/3/library
 import time             #   https://docs.python.org/3/library/time.html

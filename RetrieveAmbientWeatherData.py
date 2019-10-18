@@ -9,24 +9,27 @@
 #  and let the database sort out the duplicates.
 
 '''
+### Python3 Library documentation   #   https://docs.python.org/3/library
+import time             #   https://docs.python.org/3/library/time.html
+import datetime         #   https://docs.python.org/3/library/datetime.html
+from datetime import date           #   https://docs.python.org/3/library/datetime.html#date-objects
+from datetime import timedelta      #   https://docs.python.org/3/library/datetime.html#timedelta-objects
+from datetime import datetime as dt #   https://docs.python.org/3/library/datetime.html#datetime-objects
+from datetime import time as dtime  #   https://docs.python.org/3/library/datetime.html#time-objects
+import os               #   https://docs.python.org/3/library/os.html
+import sys              #   https://docs.python.org/3/library/sys.html
+import argparse         #   https://docs.python.org/3/library/argparse.html
+import configparser     #   https://docs.python.org/3/library/configparser.html
+import logging          #   https://docs.python.org/3/library/logging.html
+import logging.config   #   https://docs.python.org/3/library/logging.config.html
+import logging.handlers #   https://docs.python.org/3/library/logging.handlers.html
+import json             #   https://docs.python.org/3/library/json.html
+import requests         #   https://2.python-requests.org/en/master/user/quickstart/
 
-import pymysql as mysql
-from pymysql.err import Error as DbError
-import time
-import datetime
-from datetime import date
-from datetime import timedelta
-from datetime import datetime as dt
-import os
-import argparse
-import sys
-import configparser
-import logging
-import logging.config
-import logging.handlers
-import json
-from ambient_api import ambientapi
-from math import ceil as ceil
+import pymysql as mysql             #   https://pymysql.readthedocs.io/en/latest/modules/index.html
+from pymysql.err import Error as DbError    #   https://github.com/PyMySQL/PyMySQL/blob/master/pymysql/err.py
+from ambient_api import ambientapi  #   https://ambientweather.docs.apiary.io/#
+from math import ceil as ceil       #   https://docs.python.org/3/library/math.html
 
 
 ProgName, ext = os.path.splitext(os.path.basename(sys.argv[0]))

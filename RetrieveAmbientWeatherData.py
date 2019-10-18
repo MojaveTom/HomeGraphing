@@ -275,7 +275,7 @@ def main():
         holeSize = None
         if args.holeSize is not None:
             if int(args.holeSize) < 5:
-                logger.warning('Hole size must be larger than 5 min.  You specifiec: %s.'%args.holeSize)
+                logger.warning('Hole size must be larger than 5 min.  You specified: %s.'%args.holeSize)
                 logger.warning('Ignoring hole filling.')
                 holeSize = None
             else:

@@ -97,7 +97,7 @@ LocalDataOnly = False
 SaveCSVData = True  # Flags GetData function to save back to the CSV data file.
 BeginTime = None       # Number of days to plot
 DBHostDict = dict()
-
+DatabaseReadDelta = 20
 
 def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict()):
     """
@@ -111,7 +111,7 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
 
         1)  Function reads data from the CSV file if it exists, adjusts beginDate to the
         end of the data that was read from CSV so that the SQL query can read only data that
-        was not previously read.  (But only if there is more than 20 minutes unread data.)
+        was not previously read.  (But only if there is more than DatabaseReadDelta minutes unread data.)
 
         2)  The query MUST have a WHERE clause like: " AND {timeField} > '%s'"
         the {timeField} is the database column that retrieves the time data.
@@ -197,7 +197,7 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
         pass
     logger.debug('SQLbeginDate after CSV modified for SQL = %s', SQLbeginDate)
     logger.debug("Comparing: now UTC time: %s and UTC data time: %s", datetime.utcnow(), (SQLbeginDate - dataTimeOffsetUTC))
-    if ((not CSVdataRead) or (datetime.utcnow() - SQLbeginDate + dataTimeOffsetUTC) > timedelta(minutes=20)) and DBConn and query:
+    if ((not CSVdataRead) or (datetime.utcnow() - SQLbeginDate + dataTimeOffsetUTC) > timedelta(minutes=DatabaseReadDelta)) and DBConn and query:
         logger.debug('SQLbeginDate for creating SQL query %s', SQLbeginDate)
         myQuery = query%SQLbeginDate.isoformat()
         logger.info('SQL query: %s', myQuery)
@@ -385,7 +385,7 @@ def ShowGraph(graphDict):
     view(graphDict["outputFile"], new='tab')
 
 def main():
-    global DelOldCsv, SaveCSVData, DBHostDict, LocalDataOnly
+    global DelOldCsv, SaveCSVData, DBHostDict, LocalDataOnly, DatabaseReadDelta
 
     RCGraphs = {'RCSolar', 'RCLaundry', 'RCHums', 'RCTemps', 'RCWater', 'RCPower', 'RCHeaters'}
     SSGraphs = {'SSFurnace', 'SSTemps', 'SSHums', 'SSMotion'}
@@ -426,12 +426,14 @@ def main():
     parser.add_argument("--DeleteOldCSVData", dest="DeleteOld", action="store_true", help="Delete any existing CSV data for selected graphs before retrieving new.")
     parser.add_argument("--DontSaveCSVData", dest="DontSaveCSVdata", action="store_true", default=False, help="Do NOT save CSV data for selected graphs.")
     parser.add_argument("-g", "--graphs", dest="graphDefs", action="store", help="Name of graph definition file", default=defaultGraphsDefinitionFile)
+    parser.add_argument("--DbDelta", dest="DbDelta", action="store", help="Min minutes since last database read", default=DatabaseReadDelta)
     args = parser.parse_args()
     Verbosity = args.verbosity
     DelOldCsv = args.DeleteOld
     SaveCSVData = not args.DontSaveCSVdata
     LocalDataOnly = args.LocalOnly
     numDays = float(args.days)
+    DatabaseReadDelta = float(args.DbDelta)
 
     desired_plots = set()
     logger.debug('There are %s plot items specified on the command line.' % len(args.plots))

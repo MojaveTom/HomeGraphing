@@ -388,7 +388,7 @@ def main():
     global DelOldCsv, SaveCSVData, DBHostDict, LocalDataOnly, DatabaseReadDelta
 
     RCGraphs = {'RCSolar', 'RCLaundry', 'RCHums', 'RCTemps', 'RCWater', 'RCPower', 'RCHeaters'}
-    SSGraphs = {'SSFurnace', 'SSTemps', 'SSHums', 'SSMotion'}
+    SSGraphs = {'SSFurnace', 'SSTemps', 'SSHums', 'SSMotion', 'SSLights'}
 
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
     configFile = GetConfigFilePath()
@@ -420,6 +420,7 @@ def main():
     parser.add_argument("-F", "--SSFurnace", dest="plots", action="append_const", const="SSFurnace", help="Show Steamboat Furnace graph.")
     parser.add_argument("-H", "--SSHumidities", dest="plots", action="append_const", const="SSHums", help="Show Steamboat Humidities graph.")
     parser.add_argument("-T", "--SSTemperatures", dest="plots", action="append_const", const="SSTemps", help="Show Steamboat Temperatures graph.")
+    parser.add_argument("-L", "--SSLightss", dest="plots", action="append_const", const="SSLights", help="Show Steamboat Lights graph.")
     parser.add_argument("-M", "--SSMotion", dest="plots", action="append_const", const="SSMotion", help="Show Steamboat Motions graph.")
     parser.add_argument("-v", "--verbosity", dest="verbosity", action="count", help="increase output verbosity", default=0)
     parser.add_argument("--LocalDataOnly", dest="LocalOnly", action="store_true", help="Use only locally stored data for graphs; don't access remote databases.")
@@ -451,20 +452,7 @@ def main():
 
     logger.debug('Desired plots is: %s'%(desired_plots,))
 
-    allKnownPlots = SSGraphs.union(RCGraphs)
-    if len(desired_plots) > 0:
-        plotlist = list(desired_plots)
-        for p in plotlist:
-            if p not in allKnownPlots:
-                logger.warning('Plot: "%s" is unknown, and will be ignored.' % p)
-                desired_plots.remove(p)
-    if len(desired_plots) == 0:     # no options given, and no config graphs, provide a default set.
-        desired_plots = allKnownPlots        # all graphs
-        logger.debug('No known plots specified on command line; plot all known.')
-    logger.info('Desired plots set is: %s', desired_plots)
-    logger.info('Command line contains RC graphs: %s', not RCGraphs.isdisjoint(desired_plots))
-    logger.info('Command line contains SS graphs: %s', not SSGraphs.isdisjoint(desired_plots))
-
+#    allKnownPlots = SSGraphs.union(RCGraphs)
     GraphDefs = GetGraphDefs(args.graphDefs)
 
     #  Here we compute some helper fields in the GraphDefs dictionary.
@@ -473,6 +461,19 @@ def main():
     DBHosts = set()
     gdks = set(GraphDefs.keys())
     logger.debug('Graphs defined in the graph defs file are: %s' % gdks)
+    if len(desired_plots) > 0:
+        plotlist = list(desired_plots)
+        for p in plotlist:
+            if p not in gdks:
+                logger.warning('Plot: "%s" is unknown, and will be ignored.' % p)
+                desired_plots.remove(p)
+    if len(desired_plots) == 0:     # no options given, and no config graphs, provide a default set.
+        desired_plots = gdks        # all graphs
+        logger.debug('No known plots specified on command line; plot all known.')
+    logger.info('Desired plots set is: %s', desired_plots)
+    logger.info('Command line contains RC graphs: %s', not RCGraphs.isdisjoint(desired_plots))
+    logger.info('Command line contains SS graphs: %s', not SSGraphs.isdisjoint(desired_plots))
+
     desired_plots = desired_plots.intersection(gdks)
     if len(desired_plots) == 0:
         logger.debug('No desired plots are defined in the graph defs file.')

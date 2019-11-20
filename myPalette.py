@@ -22,6 +22,7 @@ class Palette(object):
     # callGroups = {}
 
     def __init__(self, colorName, num=None):
+        logger.debug('Creating palette for colorName: %s with %s colors.' % (colorName, num))
         paletteFamilies = all_palettes.keys()
         self.callGroups = {}
         try:
@@ -52,7 +53,9 @@ class Palette(object):
         else:
             minContainPalette = min(list(it.filterfalse(lambda x: x<_num, pfk)))
         if rptcnt == 1:
-            self._Palette = linear_palette(pf[minContainPalette], _num)
+            logger.debug('Generating pallette of %s colors from %s of %s.' % (_num, minContainPalette, pf[minContainPalette]))
+            self._Palette = pf[minContainPalette][0:_num]                   # Take first _num colors from palette.
+            # self._Palette = linear_palette(pf[minContainPalette], _num)   # Take evenly spaced colors form palette.
         else:
             self._Palette = linear_palette(pf[maxp]*rptcnt, _num)
         logger.debug('Creating palette: %s' % self._Palette)
@@ -76,5 +79,5 @@ class Palette(object):
         ind = self.callGroups[group]
         logger.debug('Retrieving color at index %s (goup is "%s").' % (ind, group))
         self.callGroups[group] = (ind + 1) % len(self._Palette)
-        logger.debug('Next color index for group "%s" is %s.' % (group, ind))
+        logger.debug('Next color index for group "%s" is %s; color is: %s.' % (group, ind, self._Palette[ind]))
         return self._Palette[ind]

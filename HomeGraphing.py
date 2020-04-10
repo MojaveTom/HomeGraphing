@@ -76,9 +76,9 @@ RequiredConfigParams = frozenset((
   , 'database_reader_password'
 ))
 
-filePath = os.path.abspath(os.path.expandvars('$HOME/GraphingData'))
-if not os.path.isdir(filePath):
-    os.makedirs(filePath, exist_ok=True)
+CsvFilesPath = os.path.abspath(os.path.expandvars('$HOME/GraphingData'))
+if not os.path.isdir(CsvFilesPath):
+    os.makedirs(CsvFilesPath, exist_ok=True)
 
 def GetConfigFilePath():
     fp = os.path.join(ProgPath, 'secrets.ini')
@@ -91,7 +91,7 @@ def GetConfigFilePath():
     return fp
 
 
-#  global twoWeeksAgo, filePath
+#  global twoWeeksAgo, CsvFilesPath
 DelOldCsv = False
 LocalDataOnly = False
 SaveCSVData = True  # Flags GetData function to save back to the CSV data file.
@@ -102,9 +102,9 @@ DatabaseReadDelta = 20
 def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict()):
     """
         fileName            <string>        is the file name of a CSV file containing previously retrieved data
-                                relative to global filePath.
+                                relative to global CsvFilesPath.
         DBConn              <connection>    is the database connection object.
-        query               <string>        is an SQL query to retrieve the data, with %s where the begin date goes.
+        query               <string>        is an SQL query to retrieve the data, with {BeginDate} where the begin date goes.
         dataTimeOffsetUTC   <timedelta>     is the amount to adjust beginDate for selecting new data.
                                 Add this number to a UTC time to get a corresponding time in the DATABASE.
                                 Subtract this number (of hours) from a database time to get UTC.
@@ -113,7 +113,7 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
         end of the data that was read from CSV so that the SQL query can read only data that
         was not previously read.  (But only if there is more than DatabaseReadDelta minutes unread data.)
 
-        2)  The query MUST have a WHERE clause like: " AND {timeField} > '%s'"
+        2)  The query MUST have a WHERE clause like: " AND {timeField} > '{BeginDate}'"
         the {timeField} is the database column that retrieves the time data.
         The beginDate is adjusted by use of dataTimeOffsetUTC so that what gets
         filled into the query is in the same time zone as the native data in the database.
@@ -166,7 +166,7 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
 
     logger.debug('call args -- fileName: %s, DBConn: %s, query: %s', fileName, DBConn, query)
     logger.debug('beginDate = %s dataTimeOffsetUTC = %s', beginDate, dataTimeOffsetUTC)
-    theFile = os.path.join(filePath, fileName)
+    theFile = os.path.join(CsvFilesPath, fileName)
     logger.info('theFile: %s', theFile)
     CSVdataRead = False     # flag is true if we read csv data
     if  os.path.exists(theFile):
@@ -192,14 +192,14 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
                 logger.debug('CSVdata index:\n%s', fdata.index)
                 CSVdataRead = True
     else:
-        logger.warning('CSV file does not exist.')
+        logger.warning('CSV file "%s" does not exist.'%theFile)
         fdata = None
         pass
     logger.debug('SQLbeginDate after CSV modified for SQL = %s', SQLbeginDate)
     logger.debug("Comparing: now UTC time: %s and UTC data time: %s", datetime.utcnow(), (SQLbeginDate - dataTimeOffsetUTC))
     if ((not CSVdataRead) or (datetime.utcnow() - SQLbeginDate + dataTimeOffsetUTC) > timedelta(minutes=DatabaseReadDelta)) and DBConn and query:
         logger.debug('SQLbeginDate for creating SQL query %s', SQLbeginDate)
-        myQuery = query%SQLbeginDate.isoformat()
+        myQuery = query.format(BeginDate=SQLbeginDate.isoformat())
         logger.info('SQL query: %s', myQuery)
         data = pd.read_sql_query(myQuery, DBConn, index_col='Time')
         if data.index.size != 0:
@@ -329,6 +329,7 @@ def ShowGraph(graphDict):
         query = item['query'].format(
               my_schema=hostItem['myschema']
             , ha_schema=hostItem['haschema']
+            , BeginDate='{BeginDate}'       # Leave {BeginDate} unmolested; it is for later replacement.
             )
         if item['dataTimeZone'] == 'UTC':
             dataTimeOffsetUTC = 0
@@ -393,8 +394,9 @@ def main():
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
     configFile = GetConfigFilePath()
     configFileDir = os.path.dirname(configFile)
-    defaultGraphsDefinitionFile = os.path.join(configFileDir, "AllGraphs.json")
-
+    defaultGraphsDefinitionFile = os.path.join(os.getcwd(), "AllGraphs.json")
+    if not os.path.exists(defaultGraphsDefinitionFile):
+        defaultGraphsDefinitionFile = os.path.join(configFileDir, "AllGraphs.json")
     config.read(configFile)
     cfgSection = os.path.basename(sys.argv[0])+"/"+os.environ['HOST']
     logger.info("INI file cofig section is: %s", cfgSection)
@@ -453,6 +455,7 @@ def main():
     logger.debug('Desired plots is: %s'%(desired_plots,))
 
 #    allKnownPlots = SSGraphs.union(RCGraphs)
+    logger.info('Using graph definitions from "%s"'%args.graphDefs)
     GraphDefs = GetGraphDefs(args.graphDefs)
 
     #  Here we compute some helper fields in the GraphDefs dictionary.

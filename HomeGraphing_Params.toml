@@ -1,0 +1,321 @@
+ProgramDescription = "Graph data from home databases."
+
+[PositionalArgParserArgs]
+paramName = "plots"
+action = "append"
+nargs = "*"
+help = "Optional list of plots to show."
+
+[[Parameters]]
+paramName = "RCLaundry"
+description = "Show Ridgecrest Laundry Trap graph."
+intermediate = true
+[Parameters.argParserArgs]
+short = "-l"
+dest = "plots"
+action = "append_const"
+const = "RCLaundry"
+
+[[Parameters]]
+paramName = "RCSolar"
+description = "Show Ridgecrest Solar graph."
+intermediate = true
+[Parameters.argParserArgs]
+short = "-s"
+dest = "plots"
+action = "append_const"
+const = "RCSolar"
+
+[[Parameters]]
+paramName = "RCHums"
+description = "Show Ridgecrest Humidities graph."
+intermediate = true
+[Parameters.argParserArgs]
+short = "-u"
+dest = "plots"
+action = "append_const"
+const = "RCHums"
+
+[[Parameters]]
+paramName = "RCTemps"
+description = "Show Ridgecrest Temperature graph."
+intermediate = true
+[Parameters.argParserArgs]
+short = "-t"
+dest = "plots"
+action = "append_const"
+const = "RCTemps"
+
+[[Parameters]]
+paramName = "RCWater"
+description = "Show Ridgecrest Water graph."
+intermediate = true
+[Parameters.argParserArgs]
+short = "-w"
+dest = "plots"
+action = "append_const"
+const = "RCWater"
+
+[[Parameters]]
+paramName = "RCHeaters"
+description = "Show Ridgecrest Heaters graph."
+intermediate = true
+[Parameters.argParserArgs]
+short = "-e"
+dest = "plots"
+action = "append_const"
+const = "RCHeaters"
+
+[[Parameters]]
+paramName = "RCPower"
+description = "Show Ridgecrest Power graph."
+intermediate = true
+[Parameters.argParserArgs]
+short = "-p"
+dest = "plots"
+action = "append_const"
+const = "RCPower"
+
+[[Parameters]]
+paramName = "SSFurnace"
+description = "Show Steamboat Furnace graph."
+intermediate = true
+[Parameters.argParserArgs]
+short = "-F"
+dest = "plots"
+action = "append_const"
+const = "SSFurnace"
+
+[[Parameters]]
+paramName = "SSHums"
+description = "Show Steamboat Humidities graph."
+intermediate = true
+[Parameters.argParserArgs]
+short = "-H"
+dest = "plots"
+action = "append_const"
+const = "SSHums"
+
+[[Parameters]]
+paramName = "SSTemps"
+description = "Show Steamboat Temperatures graph."
+intermediate = true
+[Parameters.argParserArgs]
+short = "-T"
+dest = "plots"
+action = "append_const"
+const = "SSTemps"
+
+[[Parameters]]
+paramName = "SSLights"
+description = "Show Steamboat Illumination graph."
+intermediate = true
+[Parameters.argParserArgs]
+short = "-L"
+dest = "plots"
+action = "append_const"
+const = "SSLights"
+
+[[Parameters]]
+paramName = "SSMotion"
+description = "Show Steamboat Motion graph."
+intermediate = true
+[Parameters.argParserArgs]
+short = "-M"
+dest = "plots"
+action = "append_const"
+const = "SSMotion"
+
+[[Parameters]]
+paramName = "plots"
+description = "List of desired plots."
+[Parameters.argParserArgs]
+long = "--PLOTLIST"        # Need an option for add_argument
+dest = "plots"
+action = "append_const"
+const = "A"
+
+[[Parameters]]
+paramName = "LocalDataOnly"
+type = "bool"
+description = "Use only locally stored data for graphs; dont access remote databases."
+default = ""        # bool("") is false; bool("nonempty") is true
+[Parameters.argParserArgs]
+long = "--LocalDataOnly"
+dest = "LocalDataOnly"
+action = "store_true"
+
+[[Parameters]]
+paramName = "DeleteOldCSVData"
+type = "bool"
+description = "Delete any existing CSV data for selected graphs before retrieving new."
+default = ""        # bool("") is false; bool("nonempty") is true
+[Parameters.argParserArgs]
+long = "--DeleteOldCSVData"
+dest = "DeleteOldCSVData"
+action = "store_true"
+
+[[Parameters]]
+paramName = "DontSaveCSVData"
+type = "bool"
+description = "Do NOT save CSV data for selected graphs."
+default = ""        # bool("") is false; bool("nonempty") is true
+[Parameters.argParserArgs]
+long = "--DontSaveCSVData"
+dest = "DontSaveCSVData"
+action = "store_true"
+
+[[Parameters]]
+paramName = "DatabaseReadDelta"
+type = "float"
+description = "Do not re-read database unless this many min has since last read."
+default = 20
+configName = "database_read_delta"
+[Parameters.argParserArgs]
+long = "--DbDelta"
+dest = "DatabaseReadDelta"
+action = "store"
+type = "float"
+
+[[Parameters]]
+paramName = "GraphDefsFileName"
+description = "Name of graph definition file."
+configName = "graph_defs_file_name"
+default = "os.path.join(os.getcwd(), 'AllGraphs.json')"
+[Parameters.argParserArgs]
+short = "-g"
+long = "--graphDefsFileName"
+dest = "GraphDefsFileName"
+action = "store"
+
+
+[[Parameters]]
+paramName = "NumDays"
+type = "float"
+description = "Number of days of data to plot."
+default = 14
+[Parameters.argParserArgs]
+short = "-d"
+long = "--days"
+dest = "days"
+action = "store"
+
+# logger.setLevel(DefaultLoggingLevel - Verbosity*VerbosityLevelMultiplier + Quietude*VerbosityLevelMultiplier)
+[[Parameters]]
+paramName = "DefaultLoggingLevel"
+# type = "int"
+description = "Verbosity level starting point for Verbosity."
+default = "logging.INFO"
+[Parameters.argParserArgs]
+long = "--DefaultLoggingLevel"
+dest = "DefaultLoggingLevel"
+action = "store"
+
+[[Parameters]]
+paramName = "Verbosity"
+type = "int"
+description = "Output verbosity, higher is more."
+default = 0
+[Parameters.argParserArgs]
+short = "-v"
+long = "--verbosity"
+dest = "verbosity"
+action = "count"
+help = "Increase output verbosity"
+default = 0
+
+[[Parameters]]
+paramName = "Quietude"
+type = "int"
+description = "Output verbosity, higher is less."
+default = 0
+[Parameters.argParserArgs]
+short = "-q"
+long = "--quiet"
+dest = "Quietude"
+action = "count"
+help = "Decrease output verbosity"
+default = 0
+
+[[Parameters]]
+# Value determined by examining https://docs.python.org/3/library/logging.html#logging-levels
+paramName = "VerbosityLevelMultiplier"
+type = "int"
+description = "The difference in various logging levels."
+default = 10
+
+[[Parameters]]
+paramName = "ss_my_schema"
+type = "str"
+description = "The Steamboat database schema that contains the my data."
+configName = "ss_my_schema"
+default = "Steamboat"
+
+[[Parameters]]
+paramName = "rc_my_schema"
+type = "str"
+description = "The Ridgecrest database schema that contains the my data."
+configName = "rc_my_schema"
+default = "demay_farm"
+
+[[Parameters]]
+paramName = "ss_ha_schema"
+type = "str"
+description = "The Steamboat database schema that contains the homeassistant data."
+configName = "ss_ha_schema"
+default = "homeassistant"
+
+[[Parameters]]
+paramName = "rc_ha_schema"
+type = "str"
+description = "The Ridgecrest database schema that contains the homeassistant data."
+configName = "rc_ha_schema"
+default = "homeassistant"
+
+[[Parameters]]
+paramName = "rc_database_host"
+type = "str"
+description = "The IP address of the Ridgecrest database host."
+configName = "rc_database_host"
+
+[[Parameters]]
+paramName = "ss_database_host"
+type = "str"
+description = "The IP address of the Steamboat database host."
+configName = "ss_database_host"
+
+[[Parameters]]
+paramName = "rc_database_port"
+type = "int"
+description = "The port on the Ridgecrest database host."
+configName = "rc_database_port"
+
+[[Parameters]]
+paramName = "ss_database_port"
+type = "int"
+description = "The port on the Steamboat database host."
+configName = "ss_database_port"
+
+[[Parameters]]
+paramName = "rc_database_reader_user"
+type = "str"
+description = "The database user to use to access the Ridgecrest database host."
+configName = "rc_database_reader_user"
+
+[[Parameters]]
+paramName = "ss_database_reader_user"
+type = "str"
+description = "The database user to use to access the Steamboat database host."
+configName = "ss_database_reader_user"
+
+[[Parameters]]
+paramName = "rc_database_reader_password"
+type = "str"
+description = "The database user password to use to access the Ridgecrest database host."
+configName = "rc_database_reader_password"
+
+[[Parameters]]
+paramName = "ss_database_reader_password"
+type = "str"
+description = "The database user password to use to access the Steamboat database host."
+configName = "ss_database_reader_password"

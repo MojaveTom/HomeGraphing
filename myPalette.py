@@ -21,7 +21,11 @@ class Palette(object):
     # _Palette = all_palettes['Dark2'][8]
     # callGroups = {}
 
-    def __init__(self, colorName, num=None):
+    def __init__(self, colorName, num=None, *args, **kwargs):
+
+        if kwargs.get('loggingLevel') is not None:
+            logger.setLevel(kwargs.get('loggingLevel'))
+
         logger.debug('Creating palette for colorName: %s with %s colors.' % (colorName, num))
         paletteFamilies = all_palettes.keys()
         self.callGroups = {}

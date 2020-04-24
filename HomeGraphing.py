@@ -1,46 +1,70 @@
 #!/usr/bin/env python3
+'''Program plots data from home databases.
 
-import pandas as pd
-import numpy as np
-from bokeh.layouts import gridplot
-from bokeh.plotting import figure, show, output_file
-from bokeh.models import ColumnDataSource, HoverTool, Legend, LegendItem
+Run with -h or --help to see command line options.
+'''
+import pandas as pd                 #   https://pandas.pydata.org/pandas-docs/stable/
+import numpy as np                  #   https://numpy.org/doc/stable/
+from bokeh.layouts import gridplot  #   https://docs.bokeh.org/en/latest/docs/user_guide/layout.html
+from bokeh.plotting import figure, show, output_file    #   https://docs.bokeh.org/en/latest/docs/user_guide/plotting.html
+from bokeh.models import ColumnDataSource, HoverTool, Legend, LegendItem    #   https://docs.bokeh.org/en/latest/docs/dev_guide/models.html
 from bokeh.models import Range1d, DataRange1d, LinearAxis
-from bokeh.resources import Resources
-from bokeh.embed import file_html
-from bokeh.util.browser import view
-from bokeh.models.formatters import DatetimeTickFormatter
+from bokeh.resources import Resources       #   https://docs.bokeh.org/en/latest/docs/reference/resources.html#module-bokeh.resources
+from bokeh.embed import file_html   #   https://docs.bokeh.org/en/latest/docs/reference/embed.html#module-bokeh.embed
+from bokeh.util.browser import view #   https://docs.bokeh.org/en/latest/docs/reference/util.html#module-bokeh.util.browser
+from bokeh.models.formatters import DatetimeTickFormatter   #   https://docs.bokeh.org/en/latest/docs/reference/models/formatters.html#module-bokeh.models.formatters
 # from bokeh.models.tickers import DatetimeTicker
 
-import math
-from sqlalchemy import create_engine
-import pymysql as mysql
-import pymysql.err as Error
-import time
-import datetime
-from datetime import date
-from datetime import timedelta
-from datetime import datetime
-import os
-import argparse
-import sys
-import configparser
-import logging
-import logging.config
-import logging.handlers
-import json
+from myPalette import Palette       #   classes defined in this directory
 import myPalette
-import itertools
 from GraphDefinitions import GetGraphDefs
-from myPalette import Palette
+
+from datetime import datetime as dt #   https://docs.python.org/3/library/datetime.html#datetime-objects
+from datetime import timezone       #   https://docs.python.org/3/library/datetime.html#date-objects
+from datetime import time as dtime  #   https://docs.python.org/3/library/datetime.html#time-objects
+from datetime import timedelta      #   https://docs.python.org/3/library/datetime.html#timedelta-objects
+import os               #   https://docs.python.org/3/library/os.html
+import sys              #   https://docs.python.org/3/library/sys.html
+import argparse         #   https://docs.python.org/3/library/argparse.html
+import configparser     #   https://docs.python.org/3/library/configparser.html
+import logging          #   https://docs.python.org/3/library/logging.html
+import logging.config   #   https://docs.python.org/3/library/logging.config.html
+import logging.handlers #   https://docs.python.org/3/library/logging.handlers.html
+import json             #   https://docs.python.org/3/library/json.html
+import toml             #   https://github.com/uiri/toml    https://github.com/toml-lang/toml
+import paho.mqtt.client as mqtt     #   https://www.eclipse.org/paho/clients/python/docs/
+import paho.mqtt.publish as publish
+
+from sqlalchemy import create_engine    #   https://docs.sqlalchemy.org/en/13/  https://docs.sqlalchemy.org/en/13/core/engines.html#sqlalchemy.create_engine
+# import pymysql as mysql             #   https://pymysql.readthedocs.io/en/latest/
+# import pymysql.err as Error
+
+# comment json strips python and "//" comments form json before applying json.load routines.
+# import commentjson      #   https://github.com/vaidik/commentjson       https://commentjson.readthedocs.io/en/latest/
+# Lark is used by commentjson
+# import lark             #   https://github.com/lark-parser/lark    https://lark-parser.readthedocs.io/en/latest/
+import threading          #   https://docs.python.org/3/library/threading.html
+
+import serial             #   https://pythonhosted.org/pyserial/
+# from serial.threaded import *
+
+from prodict import Prodict             #   https://github.com/ramazanpolat/prodict
+from progparams.ProgramParametersDefinitions import MakeParams
 
 ProgName, ext = os.path.splitext(os.path.basename(sys.argv[0]))
 ProgPath = os.path.dirname(os.path.realpath(sys.argv[0]))
-logConfFileName = os.path.join(ProgPath, ProgName + '_loggingconf.json')
+
+##############Logging Settings##############
+#####  Setup logging; first try for file specific, and if it doesn't exist, use a folder setup file.
+#
+#   See https://docs.python.org/3/howto/logging-cookbook.html#formatting-styles for interesting ideas.
+#
+logConfFileName = os.path.join(ProgPath, ProgName + '_loggingconf.toml')
+if not os.path.isfile(logConfFileName):
+    logConfFileName = os.path.join(ProgPath, 'Loggingconf.toml')
 if os.path.isfile(logConfFileName):
     try:
-        with open(logConfFileName, 'r') as logging_configuration_file:
-            config_dict = json.load(logging_configuration_file)
+        config_dict = toml.load(logConfFileName)
         if 'log_file_path' in config_dict:
             logPath = os.path.expandvars(config_dict['log_file_path'])
             os.makedirs(logPath, exist_ok=True)
@@ -48,17 +72,39 @@ if os.path.isfile(logConfFileName):
             logPath=""
         for p in config_dict['handlers'].keys():
             if 'filename' in config_dict['handlers'][p]:
-                logFileName = os.path.join(logPath, config_dict['handlers'][p]['filename'])
-                config_dict['handlers'][p]['filename'] = logFileName
+                fn = os.path.join(logPath, config_dict['handlers'][p]['filename'].replace('<replaceMe>', ProgName))
+                config_dict['handlers'][p]['filename'] = fn
+                # print('Setting handler %s filename to: %s'%(p, fn))
+
+        # # program specific logging configurations:
+        # config_dict["handlers"]["debugconsole"]["level"] = 'NOTSET'
+        # # config_dict["handlers"]["debug_file_handler"]["class"] = 'logging.FileHandler'
+        # config_dict["handlers"]["debug_file_handler"]["mode"] = '\'w\''
+
         logging.config.dictConfig(config_dict)
     except Exception as e:
         print("loading logger config from file failed.")
         print(e)
         pass
+else:
+    print("Logging configuration file not found.")
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("Debug  Logger")
+console = logging.getLogger("ConsoleLogger")
+
+logger.setLevel('NOTSET')
+console.setLevel(('INFO'))
+
 logger.info('logger name is: "%s"', logger.name)
+console.info('Console logger name is: "%s"', console.name)
+debug = logger.debug
+info = console.info
+critical = logger.critical
 
+#########################################
+PP = Prodict()
+
+helperFunctionLoggingLevel = logging.WARNING
 DBConn = None
 DBCursor = None
 Topics = []    # default topics to subscribe
@@ -79,17 +125,6 @@ RequiredConfigParams = frozenset((
 CsvFilesPath = os.path.abspath(os.path.expandvars('$HOME/GraphingData'))
 if not os.path.isdir(CsvFilesPath):
     os.makedirs(CsvFilesPath, exist_ok=True)
-
-def GetConfigFilePath():
-    fp = os.path.join(ProgPath, 'secrets.ini')
-    if not os.path.isfile(fp):
-        fp = os.environ['PrivateConfig']
-        if not os.path.isfile(fp):
-            logger.error('No configuration file found: %s', fp)
-            sys.exit(1)
-    logger.info('Using configuration file at: %s', fp)
-    return fp
-
 
 #  global twoWeeksAgo, CsvFilesPath
 DelOldCsv = False
@@ -196,8 +231,8 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
         fdata = None
         pass
     logger.debug('SQLbeginDate after CSV modified for SQL = %s', SQLbeginDate)
-    logger.debug("Comparing: now UTC time: %s and UTC data time: %s", datetime.utcnow(), (SQLbeginDate - dataTimeOffsetUTC))
-    if ((not CSVdataRead) or (datetime.utcnow() - SQLbeginDate + dataTimeOffsetUTC) > timedelta(minutes=DatabaseReadDelta)) and DBConn and query:
+    logger.debug("Comparing: now UTC time: %s and UTC data time: %s", dt.utcnow(), (SQLbeginDate - dataTimeOffsetUTC))
+    if ((not CSVdataRead) or (dt.utcnow() - SQLbeginDate + dataTimeOffsetUTC) > timedelta(minutes=DatabaseReadDelta)) and DBConn and query:
         logger.debug('SQLbeginDate for creating SQL query %s', SQLbeginDate)
         myQuery = query.format(BeginDate=SQLbeginDate.isoformat())
         logger.info('SQL query: %s', myQuery)
@@ -234,7 +269,7 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
     else:
         if DBConn and query:
             logger.info("CSV data is recent enough; don't query database. ")
-            logger.debug("now %s SQLbeginDate %s diff %s", datetime.utcnow(), SQLbeginDate, (datetime.utcnow() - SQLbeginDate))
+            logger.debug("now %s SQLbeginDate %s diff %s", dt.utcnow(), SQLbeginDate, (dt.utcnow() - SQLbeginDate))
         elif LocalDataOnly:
             logger.debug('Using local data only; no database data desired.  No SQL data.')
         else:
@@ -304,7 +339,7 @@ def ShowGraph(graphDict):
         eyrName = 'Y%s_axis' % i
         clr = ya['color_map']
         if clr is None: clr = graphDict["graph_color_map"]
-        ya["cmap"] = myPalette.Palette(clr, graphDict['max_palette_len'])
+        ya["cmap"] = myPalette.Palette(clr, graphDict['max_palette_len'], loggingLevel=helperFunctionLoggingLevel)
         clr = ya['color']
         if clr is None: clr = "black"
         side = ya['location']
@@ -385,61 +420,48 @@ def ShowGraph(graphDict):
     f.close()
     view(graphDict["outputFile"], new='tab')
 
+def GetConfigFilePath():
+    fp = os.path.join(ProgPath, 'secrets.ini')
+    if not os.path.isfile(fp):
+        fp = os.environ['PrivateConfig']
+        if not os.path.isfile(fp):
+            logger.error('No configuration file found: %s', fp)
+            sys.exit(1)
+    logger.info('Using configuration file at: %s', fp)
+    return fp
+
 def main():
-    global DelOldCsv, SaveCSVData, DBHostDict, LocalDataOnly, DatabaseReadDelta
+    global DelOldCsv, SaveCSVData, DBHostDict, LocalDataOnly, DatabaseReadDelta, helperFunctionLoggingLevel, PP
 
     RCGraphs = {'RCSolar', 'RCLaundry', 'RCHums', 'RCTemps', 'RCWater', 'RCPower', 'RCHeaters'}
     SSGraphs = {'SSFurnace', 'SSTemps', 'SSHums', 'SSMotion', 'SSLights'}
 
-    config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
-    configFile = GetConfigFilePath()
-    configFileDir = os.path.dirname(configFile)
-    defaultGraphsDefinitionFile = os.path.join(os.getcwd(), "AllGraphs.json")
-    if not os.path.exists(defaultGraphsDefinitionFile):
-        defaultGraphsDefinitionFile = os.path.join(configFileDir, "AllGraphs.json")
-    config.read(configFile)
-    cfgSection = os.path.basename(sys.argv[0])+"/"+os.environ['HOST']
-    logger.info("INI file cofig section is: %s", cfgSection)
-    if not config.has_section(cfgSection):
-        logger.critical('Config file "%s", has no section "%s".', configFile, cfgSection)
-        sys.exit(2)
-    if set(config.options(cfgSection)) < RequiredConfigParams:
-        logger.critical('Config  section "%s" does not have all required params: "%s", it has params: "%s".', cfgSection, RequiredConfigParams, set(config.options(cfgSection)))
-        sys.exit(3)
+    cfg = MakeParams(loggingLevel=helperFunctionLoggingLevel)
 
-    cfg = config[cfgSection]
+    if cfg is None:
+        critical(f"Could not create parameters.  Must quit.")
+        return
+    else:
+        args = Prodict.from_dict(cfg)
+        debug(f"MakeParams returns non None dictionary, so args (and PP) become: {args}")
+        PP = Prodict.from_dict(cfg)
 
-    parser = argparse.ArgumentParser(description = 'Display graphs of home parameters.\nDefaults to show all.')
-    parser.add_argument("plots", action="append", nargs="*", help="Optional list of plots to generate.")
-    parser.add_argument("-d", "--days", dest="days", action="store", help="Number of days of data to plot", default=14)
-    parser.add_argument("-l", "--laundry", dest="plots", action="append_const", const="RCLaundry", help="Show Ridgecrest Laundry Trap graph.")
-    parser.add_argument("-s", "--solar", dest="plots", action="append_const", const="RCSolar", help="Show Ridgecrest Solar graph.")
-    parser.add_argument("-u", "--humidities", dest="plots", action="append_const", const="RCHums", help="Show Ridgecrest Humidities graph.")
-    parser.add_argument("-t", "--temperatures", dest="plots", action="append_const", const="RCTemps", help="Show Ridgecrest Temperatures graph.")
-    parser.add_argument("-w", "--water", dest="plots", action="append_const", const="RCWater", help="Show Ridgecrest Water graph.")
-    parser.add_argument("-e", "--heaters", dest="plots", action="append_const", const="RCHeaters", help="Show Ridgecrest Heaters graph.")
-    parser.add_argument("-p", "--power", dest="plots", action="append_const", const="RCPower", help="Show Ridgecrest Power graph.")
-    parser.add_argument("-F", "--SSFurnace", dest="plots", action="append_const", const="SSFurnace", help="Show Steamboat Furnace graph.")
-    parser.add_argument("-H", "--SSHumidities", dest="plots", action="append_const", const="SSHums", help="Show Steamboat Humidities graph.")
-    parser.add_argument("-T", "--SSTemperatures", dest="plots", action="append_const", const="SSTemps", help="Show Steamboat Temperatures graph.")
-    parser.add_argument("-L", "--SSLightss", dest="plots", action="append_const", const="SSLights", help="Show Steamboat Lights graph.")
-    parser.add_argument("-M", "--SSMotion", dest="plots", action="append_const", const="SSMotion", help="Show Steamboat Motions graph.")
-    parser.add_argument("-v", "--verbosity", dest="verbosity", action="count", help="increase output verbosity", default=0)
-    parser.add_argument("--LocalDataOnly", dest="LocalOnly", action="store_true", help="Use only locally stored data for graphs; don't access remote databases.")
-    parser.add_argument("--DeleteOldCSVData", dest="DeleteOld", action="store_true", help="Delete any existing CSV data for selected graphs before retrieving new.")
-    parser.add_argument("--DontSaveCSVData", dest="DontSaveCSVdata", action="store_true", default=False, help="Do NOT save CSV data for selected graphs.")
-    parser.add_argument("-g", "--graphs", dest="graphDefs", action="store", help="Name of graph definition file", default=defaultGraphsDefinitionFile)
-    parser.add_argument("--DbDelta", dest="DbDelta", action="store", help="Min minutes since last database read", default=DatabaseReadDelta)
-    args = parser.parse_args()
-    Verbosity = args.verbosity
-    DelOldCsv = args.DeleteOld
-    SaveCSVData = not args.DontSaveCSVdata
-    LocalDataOnly = args.LocalOnly
-    numDays = float(args.days)
-    DatabaseReadDelta = float(args.DbDelta)
+    Verbosity = args.Verbosity
+    console.setLevel(args.DefaultLoggingLevel - args.Verbosity*args.VerbosityLevelMultiplier + args.Quietude*args.VerbosityLevelMultiplier)
+    DelOldCsv = args.DeleteOldCSVData
+    SaveCSVData = not args.DontSaveCSVData
+    LocalDataOnly = args.LocalDataOnly
+    numDays = float(args.NumDays)
+    DatabaseReadDelta = float(args.DatabaseReadDelta)
 
     desired_plots = set()
     logger.debug('There are %s plot items specified on the command line.' % len(args.plots))
+    # # "flatten" and add args.plot items to desired_plots
+    # from itertools import chain
+    # flatten = chain.from_iterable
+
+    # debug(f"args.plots is {args.plots}")
+    # desired_plots = set(flatten([args.plots,]))
     for i in range(len(args.plots)):
         itm = args.plots[i]
         logger.debug('Plots item %s is %s' % (i, itm))
@@ -455,8 +477,8 @@ def main():
     logger.debug('Desired plots is: %s'%(desired_plots,))
 
 #    allKnownPlots = SSGraphs.union(RCGraphs)
-    logger.info('Using graph definitions from "%s"'%args.graphDefs)
-    GraphDefs = GetGraphDefs(args.graphDefs)
+    logger.info('Using graph definitions from "%s"'%args.GraphDefsFileName)
+    GraphDefs = GetGraphDefs(args.GraphDefsFileName, loggingLevel=helperFunctionLoggingLevel)
 
     #  Here we compute some helper fields in the GraphDefs dictionary.
     #  Do this here because we don't want to pollute the GetGraphDefs function
@@ -508,9 +530,9 @@ def main():
     gdks = sorted(GraphDefs.keys())
     logger.debug('Sorted list of graphs (from GraphDefs.keys): %s' % gdks)
 
-    logger.debug('GraphDefs dict is: %s' % json.dumps(GraphDefs, indent=2))
+    # logger.debug('GraphDefs dict is: %s' % json.dumps(GraphDefs, indent=2))
     if LocalDataOnly:
-        ServerTimeFromUTC = datetime.utcnow() - datetime.now()      # Use current system as database host for time purposes.
+        ServerTimeFromUTC = dt.utcnow() - dt.now()      # Use current system as database host for time purposes.
         for h in DBHosts:       # create "dummy" host entry
             logger.debug('Creating "dummy" host entry for %s' % h)
             DBHostDict[h] = dict()
@@ -519,8 +541,8 @@ def main():
             dbhd['haschema'] = 'haschema'
             dbhd['myschema'] = 'myschema'
             dbhd['conn'] = None
-            dbhd['twoWeeksAgo'] = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=14))
-            dbhd['BeginTime'] = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
+            dbhd['twoWeeksAgo'] = (dt.utcnow() + ServerTimeFromUTC - timedelta(days=14))
+            dbhd['BeginTime'] = (dt.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
             dbhd['ServerTimeFromUTC'] = ServerTimeFromUTC
             logger.debug("%s Server time offset from UTC: %s" % (h, dbhd['ServerTimeFromUTC']))
             logger.debug("%s BeginTime: %s" % (h, dbhd['BeginTime']))
@@ -530,25 +552,26 @@ def main():
         for k in gdks:
             logger.info('             ##############   Preparing graph "%s"   #################' % k)
             ShowGraph(GraphDefs[k])
-        logger.info('             ##############   All Done   #################')
         return
 
     for h in DBHosts:
         DBHostDict[h] = dict()
         dbhd = DBHostDict[h]
-        user = cfg['database_reader_user']
-        pwd  = cfg['database_reader_password']
-        host = cfg['%s_database_host'%h]
-        port = cfg['%s_database_port'%h]
-        dbhd['haschema'] = cfg['%s_ha_schema'%h]
-        dbhd['myschema'] = cfg['%s_my_schema'%h]
-        logger.info("%s user %s"%(h, user))
-        logger.info("%s pwd %s"%(h, pwd))
-        logger.info("%s host %s"%(h, host))
-        logger.info("%s port %s"%(h, port))
-        logger.info("%s haschema %s"%(h, dbhd['haschema']))
-        logger.info("%s myschema %s"%(h, dbhd['myschema']))
+        user = cfg[f'{h}_database_reader_user']
+        pwd  = cfg[f'{h}_database_reader_password']
+        host = cfg[f'{h}_database_host']
+        port = cfg[f'{h}_database_port']
+        dbhd['haschema'] = cfg[f'{h}_ha_schema']
+        dbhd['myschema'] = cfg[f'{h}_my_schema']
+        logger.info(f"{h} user {user}")
+        logger.info(f"{h} pwd {pwd}")
+        logger.info(f"{h} host {host}")
+        logger.info(f"{h} port {port}")
+        logger.info(f"{h} haschema {dbhd['haschema']}")
+        logger.info(f"{h} myschema {dbhd['myschema']}")
 
+        # schema in connection string is not important since all queries specify the
+        #   schema for the table being accessed.
         connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=dbhd['haschema'])
         logger.debug("%s database connection string: %s" % (h, connstr))
         Eng = create_engine(connstr, echo = True if Verbosity>=2 else False, logging_name = logger.name)
@@ -559,8 +582,8 @@ def main():
             result = conn.execute("select timestampdiff(hour, utc_timestamp(), now());")
             for row in result:
                 ServerTimeFromUTC = timedelta(hours=row[0])
-            dbhd['twoWeeksAgo'] = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=14))
-            dbhd['BeginTime'] = (datetime.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
+            dbhd['twoWeeksAgo'] = (dt.utcnow() + ServerTimeFromUTC - timedelta(days=14))
+            dbhd['BeginTime'] = (dt.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
             dbhd['ServerTimeFromUTC'] = ServerTimeFromUTC
             logger.debug("%s Server time offset from UTC: %s" % (h, dbhd['ServerTimeFromUTC']))
             logger.debug("%s BeginTime: %s" % (h, dbhd['BeginTime']))
@@ -568,12 +591,14 @@ def main():
             for k in gdks:
                 gd = GraphDefs[k]
                 if gd["DBHost"] == h:
-                    logger.info('             ##############   Preparing graph "%s"   #################' % k)
+                    logger.info(f'             ##############   Preparing graph "{k}"   #################')
                     ShowGraph(GraphDefs[k])
         # "DBEngine" and "conn" items in DBHostDict are not serializable, so can't dump them
     # logger.debug('DBHostDict is: %s' % json.dumps(DBHostDict, indent=2))
-    logger.info('             ##############   All Done   #################')
 
 if __name__ == "__main__":
+    info(f'####################  {ProgName} starts  @  {dt.now().isoformat(sep=" ")}   #####################')
     main()
+    info(f'####################  {ProgName} all done  @  {dt.now().isoformat(sep=" ")}   #####################')
+    logging.shutdown()
     pass

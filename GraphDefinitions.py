@@ -16,6 +16,9 @@ MyPath = os.path.dirname(os.path.realpath(__file__))
 logger.debug('MyPath in GraphDefinitions is: %s' % MyPath)
 # logger.debug('bokeh __palettes__ are: %s' % bp.__palettes__)
 bokehKnownColors = bc.named.__all__
+#  This makes the VSCode happy, but I don't think it will work as I intend.
+# bokehPaletteFamilies = list(bp._PalettesModule.all_palettes)
+##  The following works for Python, but not for VSCode.
 bokehPaletteFamilies = list(bp.all_palettes.keys())
 palettesAndColors = bokehPaletteFamilies + bokehKnownColors
 
@@ -39,7 +42,7 @@ gds = {str: {'GraphTitle': str
                     , Optional('color', default=None): Or(
                         And(str, lambda s: s in bokehKnownColors)
                         , None, error='Axis color not defined.')
-                    , Optional('location', default='left'): 
+                    , Optional('location', default='left'):
                         And(str, lambda s: s in ('left', 'right'), error='Axis location must be "left" or "right".')}]
         , 'items': [ { 'query': Or(str, None)
                 , 'variableNames': [str]
@@ -47,9 +50,9 @@ gds = {str: {'GraphTitle': str
                 , 'dataname': str
                 , Optional('axisNum', default=0): Use(int)
                 , Optional('includeInLegend', default=True): Use(bool)
-                , Optional('lineType', default='line'): 
+                , Optional('lineType', default='line'):
                         And(str, lambda s: s in ('line', 'step'), error='Item lineType must be "line" or "step".')
-                , Optional('dataTimeZone', default='serverLocal'): 
+                , Optional('dataTimeZone', default='serverLocal'):
                         And(str, lambda s: s in ('serverLocal', 'UTC'), error='Item dataTimeZone must be "serverLocal" or "UTC".')
                 , Optional('lineMods', default={"glyph.line_width": "2", "muted_glyph.line_width": "4"}): {str: str}
                 , Optional('color_map', default=None): Or(
@@ -64,8 +67,13 @@ gds = {str: {'GraphTitle': str
 # with open(os.path.join(MyPath, "GraphDefsSchema.json"), 'w') as file:
 #     json.dump(gds, file, indent=2)
 
-def GetGraphDefs(GraphDefFile=None):
+def GetGraphDefs(GraphDefFile=None, *args, **kwargs):
+
+    if kwargs.get('loggingLevel') is not None:
+        logger.setLevel(kwargs.get('loggingLevel'))
+
     GraphDefsSchema = Schema(gds, name = 'Graphing Schema')
+    logger.debug(f"Entered GetGraphDefs with argument {GraphDefFile}")
     if GraphDefFile is None:
         GraphDefFile = os.path.join(MyPath, "OneLineGraph.json")
     if not os.path.isfile(GraphDefFile) and not os.path.isabs(GraphDefFile):
@@ -87,4 +95,4 @@ def GetGraphDefs(GraphDefFile=None):
         logger.critical('Graph definition dictionary is not valid.  %s', e)
         logger.debug('%s' % e.autos)
         exit(1)
-    return GraphDefs    
+    return GraphDefs

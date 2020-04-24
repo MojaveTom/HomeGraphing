@@ -4,5 +4,9 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {},
+	"python.autoComplete.extraPaths": [
+		"/Volumes/UsersData/tom/usr/local/lib/python3.7/site-packages/bokeh",
+
+	]
 }

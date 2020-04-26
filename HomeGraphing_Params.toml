@@ -200,50 +200,6 @@ long = "--days"
 dest = "days"
 action = "store"
 
-# logger.setLevel(DefaultLoggingLevel - Verbosity*VerbosityLevelMultiplier + Quietude*VerbosityLevelMultiplier)
-[[Parameters]]
-paramName = "DefaultLoggingLevel"
-# type = "int"
-description = "Verbosity level starting point for Verbosity."
-default = "logging.INFO"
-[Parameters.argParserArgs]
-long = "--DefaultLoggingLevel"
-dest = "DefaultLoggingLevel"
-action = "store"
-
-[[Parameters]]
-paramName = "Verbosity"
-type = "int"
-description = "Output verbosity, higher is more."
-default = 0
-[Parameters.argParserArgs]
-short = "-v"
-long = "--verbosity"
-dest = "verbosity"
-action = "count"
-help = "Increase output verbosity"
-default = 0
-
-[[Parameters]]
-paramName = "Quietude"
-type = "int"
-description = "Output verbosity, higher is less."
-default = 0
-[Parameters.argParserArgs]
-short = "-q"
-long = "--quiet"
-dest = "Quietude"
-action = "count"
-help = "Decrease output verbosity"
-default = 0
-
-[[Parameters]]
-# Value determined by examining https://docs.python.org/3/library/logging.html#logging-levels
-paramName = "VerbosityLevelMultiplier"
-type = "int"
-description = "The difference in various logging levels."
-default = 10
-
 [[Parameters]]
 paramName = "ss_my_schema"
 type = "str"

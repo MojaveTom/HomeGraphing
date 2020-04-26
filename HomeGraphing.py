@@ -93,7 +93,7 @@ logger = logging.getLogger("Debug  Logger")
 console = logging.getLogger("ConsoleLogger")
 
 logger.setLevel('NOTSET')
-console.setLevel(('INFO'))
+console.setLevel('INFO')
 
 logger.info('logger name is: "%s"', logger.name)
 console.info('Console logger name is: "%s"', console.name)
@@ -101,10 +101,19 @@ debug = logger.debug
 info = console.info
 critical = logger.critical
 
+helperFunctionLoggingLevel = logging.NOTSET
+
+def setLoggingLevel(loggingLevel):
+    #  We know about all the loggers defined for this module;
+    #  so we can set the level for all of them here in one place.
+    logger.setLevel(loggingLevel)
+    console.setLevel(loggingLevel+10)       # +10 is a hack
+setLoggingLevel(helperFunctionLoggingLevel)
+
+
 #########################################
 PP = Prodict()
 
-helperFunctionLoggingLevel = logging.WARNING
 DBConn = None
 DBCursor = None
 Topics = []    # default topics to subscribe

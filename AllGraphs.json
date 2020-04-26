@@ -603,6 +603,26 @@
       }
     ]
   },
+  "SSMoteino": {
+    "GraphTitle": "Steamboat Moteino Batteries",
+    "outputFile": "SSBattery.htm",
+    "DBHost": "SS",
+    "ShowGraph": true,
+    "XaxisTitle": "Date/Time",
+    "Yaxes": [
+      {
+        "title": "Volts"
+      }    ],
+    "items": [
+      {
+        "query": "SELECT RecTime AS 'Time', json_value(message, '$.Battery') AS 'Gateway',round(sum(json_value(message, '$.Battery')*json_value(message, '$.deltaT') over (order by rectime ROWS BETWEEN 8 PRECEDING AND 8 FOLLOWING)/sum(json_value(message, '$.deltaT') over (order by rectime ROWS BETWEEN 8 PRECEDING AND 8 FOLLOWING),3) as AveGateway FROM `{my_schema}`.`mqttmessages` WHERE topic='Testing/Moteino/1' AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime",
+        "variableNames": ["Gateway Battery", "Ave Gateway Volts"],
+        "datafile": "GatewayBattery.csv",
+        "axisNum": 0,
+        "dataname": "MOTEINO GATEWAY BATTERY"
+      }
+    ]
+  },
   "SSTemps": {
     "GraphTitle": "Steamboat Temperatures",
     "outputFile": "SSTemps.htm",

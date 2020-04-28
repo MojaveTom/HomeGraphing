@@ -4,13 +4,10 @@ log_file_path = "$HOME/Logs"
 
 [root]
 level = "NOTSET"
-handlers = [ "debugconsole", "debug_file_handler",]
+handlers = [ "console", "debug_file_handler",]
 
 [formatters.none]
 format = "%(message)s"
-
-[formatters.msg]
-format = "%(asctime)s - MESSAGE: %(message)s"
 
 [formatters.simple]
 format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -25,16 +22,10 @@ level = "NOTSET"
 formatter = "none"
 stream = "ext://sys.stdout"
 
-[handlers.message]
-class = "logging.StreamHandler"
-level = "INFO"
-formatter = "msg"
-stream = "ext://sys.stdout"
-
 [handlers.debugconsole]
 class = "logging.StreamHandler"
 level = "NOTSET"
-formatter = "simple"
+formatter = "none"
 stream = "ext://sys.stderr"
 
 [handlers.debug_file_handler]
@@ -55,18 +46,18 @@ maxBytes = 1048576
 backupCount = 3
 encoding = "utf8"
 
-[loggers."Debug  Logger"]
-level = "NOTSET"
+# [loggers."Debug  Logger"]
+# level = "NOTSET"
+# handlers = [ "console", "debug_file_handler",]
+# # handlers = [ "debug_file_handler",]
+# propagate = false
+
+# [loggers.ConsoleLogger]
+# level = "NOTSET"
+# handlers = [ "console", "debug_file_handler",]
+# propagate = false
+
+# [loggers.DebugConsoleLogger]
+# level = "NOTSET"
 # handlers = [ "debugconsole", "debug_file_handler",]
-handlers = [ "debug_file_handler",]
-propagate = false
-
-[loggers.ConsoleLogger]
-level = "NOTSET"
-handlers = [ "console", "debug_file_handler",]
-propagate = false
-
-[loggers.MessageLogger]
-level = "NOTSET"
-handlers = [ "message", "debug_file_handler",]
-propagate = false
+# propagate = false

@@ -50,66 +50,23 @@ import serial             #   https://pythonhosted.org/pyserial/
 
 from prodict import Prodict             #   https://github.com/ramazanpolat/prodict
 from progparams.ProgramParametersDefinitions import MakeParams
+from progparams.GetLoggingDict import GetLoggingDict, setConsoleLoggingLevel, setLogFileLoggingLevel, getConsoleLoggingLevel, getLogFileLoggingLevel
 
 ProgName, ext = os.path.splitext(os.path.basename(sys.argv[0]))
 ProgPath = os.path.dirname(os.path.realpath(sys.argv[0]))
 
 ##############Logging Settings##############
-#####  Setup logging; first try for file specific, and if it doesn't exist, use a folder setup file.
-#
-#   See https://docs.python.org/3/howto/logging-cookbook.html#formatting-styles for interesting ideas.
-#
-logConfFileName = os.path.join(ProgPath, ProgName + '_loggingconf.toml')
-if not os.path.isfile(logConfFileName):
-    logConfFileName = os.path.join(ProgPath, 'Loggingconf.toml')
-if os.path.isfile(logConfFileName):
-    try:
-        config_dict = toml.load(logConfFileName)
-        if 'log_file_path' in config_dict:
-            logPath = os.path.expandvars(config_dict['log_file_path'])
-            os.makedirs(logPath, exist_ok=True)
-        else:
-            logPath=""
-        for p in config_dict['handlers'].keys():
-            if 'filename' in config_dict['handlers'][p]:
-                fn = os.path.join(logPath, config_dict['handlers'][p]['filename'].replace('<replaceMe>', ProgName))
-                config_dict['handlers'][p]['filename'] = fn
-                # print('Setting handler %s filename to: %s'%(p, fn))
+config_dict = GetLoggingDict(ProgName, ProgPath)
+logging.config.dictConfig(config_dict)
 
-        # # program specific logging configurations:
-        # config_dict["handlers"]["debugconsole"]["level"] = 'NOTSET'
-        # # config_dict["handlers"]["debug_file_handler"]["class"] = 'logging.FileHandler'
-        # config_dict["handlers"]["debug_file_handler"]["mode"] = '\'w\''
+logger = logging.getLogger(__name__)
+console = logger
 
-        logging.config.dictConfig(config_dict)
-    except Exception as e:
-        print("loading logger config from file failed.")
-        print(e)
-        pass
-else:
-    print("Logging configuration file not found.")
-
-logger = logging.getLogger("Debug  Logger")
-console = logging.getLogger("ConsoleLogger")
-
-logger.setLevel('NOTSET')
-console.setLevel('INFO')
-
-logger.info('logger name is: "%s"', logger.name)
-console.info('Console logger name is: "%s"', console.name)
 debug = logger.debug
-info = console.info
+info = logger.info
 critical = logger.critical
 
-helperFunctionLoggingLevel = logging.NOTSET
-
-def setLoggingLevel(loggingLevel):
-    #  We know about all the loggers defined for this module;
-    #  so we can set the level for all of them here in one place.
-    logger.setLevel(loggingLevel)
-    console.setLevel(loggingLevel+10)       # +10 is a hack
-setLoggingLevel(helperFunctionLoggingLevel)
-
+helperFunctionLoggingLevel = logging.WARNING
 
 #########################################
 PP = Prodict()
@@ -442,11 +399,13 @@ def GetConfigFilePath():
 def main():
     global DelOldCsv, SaveCSVData, DBHostDict, LocalDataOnly, DatabaseReadDelta, helperFunctionLoggingLevel, PP
 
+    # print(f"In main, logger is {logger.__dict__!r}, and its parent is {logger.parent.__dict__!r}")
+
     RCGraphs = {'RCSolar', 'RCLaundry', 'RCHums', 'RCTemps', 'RCWater', 'RCPower', 'RCHeaters'}
     SSGraphs = {'SSFurnace', 'SSTemps', 'SSHums', 'SSMotion', 'SSLights'}
-
-    cfg = MakeParams(loggingLevel=helperFunctionLoggingLevel)
-
+    kwargs = {'loggingLevel': helperFunctionLoggingLevel}
+    cfg = MakeParams( **kwargs)
+    setConsoleLoggingLevel(helperFunctionLoggingLevel)      # in case function changed it.
     if cfg is None:
         critical(f"Could not create parameters.  Must quit.")
         return
@@ -455,8 +414,10 @@ def main():
         debug(f"MakeParams returns non None dictionary, so args (and PP) become: {args}")
         PP = Prodict.from_dict(cfg)
 
-    Verbosity = args.Verbosity
-    console.setLevel(args.DefaultLoggingLevel - args.Verbosity*args.VerbosityLevelMultiplier + args.Quietude*args.VerbosityLevelMultiplier)
+    debug(f"We have program configuration parameters: {cfg}")
+    debug(f"We have program keyword parameters: {kwargs}")
+    Verbosity = cfg['Verbosity']        # Note that this is NOT a logging level.
+
     DelOldCsv = args.DeleteOldCSVData
     SaveCSVData = not args.DontSaveCSVData
     LocalDataOnly = args.LocalDataOnly
@@ -487,7 +448,7 @@ def main():
 
 #    allKnownPlots = SSGraphs.union(RCGraphs)
     logger.info('Using graph definitions from "%s"'%args.GraphDefsFileName)
-    GraphDefs = GetGraphDefs(args.GraphDefsFileName, loggingLevel=helperFunctionLoggingLevel)
+    GraphDefs, _ = GetGraphDefs(args.GraphDefsFileName, loggingLevel=helperFunctionLoggingLevel)
 
     #  Here we compute some helper fields in the GraphDefs dictionary.
     #  Do this here because we don't want to pollute the GetGraphDefs function
@@ -497,10 +458,10 @@ def main():
     logger.debug('Graphs defined in the graph defs file are: %s' % gdks)
     if len(desired_plots) > 0:
         plotlist = list(desired_plots)
-        for p in plotlist:
-            if p not in gdks:
-                logger.warning('Plot: "%s" is unknown, and will be ignored.' % p)
-                desired_plots.remove(p)
+        for plt in plotlist:
+            if plt not in gdks:
+                logger.warning('Plot: "%s" is unknown, and will be ignored.' % plt)
+                desired_plots.remove(plt)
     if len(desired_plots) == 0:     # no options given, and no config graphs, provide a default set.
         desired_plots = gdks        # all graphs
         logger.debug('No known plots specified on command line; plot all known.')
@@ -606,8 +567,13 @@ def main():
     # logger.debug('DBHostDict is: %s' % json.dumps(DBHostDict, indent=2))
 
 if __name__ == "__main__":
-    info(f'####################  {ProgName} starts  @  {dt.now().isoformat(sep=" ")}   #####################')
+
+    setConsoleLoggingLevel(logging.INFO)
+
+    logger.info(f'####################  {ProgName} starts  @  {dt.now().isoformat(sep=" ")}   #####################')
+    setConsoleLoggingLevel(helperFunctionLoggingLevel)
     main()
-    info(f'####################  {ProgName} all done  @  {dt.now().isoformat(sep=" ")}   #####################')
+    setConsoleLoggingLevel(logging.INFO)
+    logger.info(f'####################  {ProgName} all done  @  {dt.now().isoformat(sep=" ")}   #####################')
     logging.shutdown()
     pass

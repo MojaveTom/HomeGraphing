@@ -178,10 +178,11 @@ action = "store"
 type = "float"
 
 [[Parameters]]
-paramName = "GraphDefsFileName"
+paramName = "GraphDefsFileName"     #  file name only, will look in various places to find it.
 description = "Name of graph definition file."
 configName = "graph_defs_file_name"
-default = "os.path.join(os.getcwd(), 'AllGraphs.json')"
+default = "AllGraphs"
+type = "str"
 [Parameters.argParserArgs]
 short = "-g"
 long = "--graphDefsFileName"

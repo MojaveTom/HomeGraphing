@@ -339,6 +339,13 @@
         "dataname": "SOUTH SOLAR"
       },
       {
+        "query": "SELECT Time AS 'Time', W AS 'Watts' FROM `{my_schema}`.`solarinverter_102` WHERE Time > '{BeginDate}' ORDER BY Time",
+        "variableNames": ["Watts"],
+        "datafile": "RCSolar.csv",
+        "axisNum": 0,
+        "dataname": "RIDGECREST SOLAR"
+      },
+      {
         "query": "SELECT date AS 'Time', solarradiation as SolarRad FROM `{my_schema}`.`rcweather` WHERE date > '{BeginDate}' ORDER BY date",
         "variableNames": ["SolarRad"],
         "datafile": "SolarRad.csv",

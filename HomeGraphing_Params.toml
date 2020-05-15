@@ -189,6 +189,17 @@ long = "--graphDefsFileName"
 dest = "GraphDefsFileName"
 action = "store"
 
+[[Parameters]]
+paramName = "HtmlDirectory"     #  file name only, will look in various places to find it.
+description = "Directory in which to store html graph files."
+configName = "html_directory"
+default = "$HOME/GraphingHtml"
+type = "os.path.expandvars"
+[Parameters.argParserArgs]
+short = "-G"
+long = "--htmlDirectory"
+dest = "HtmlDirectory"
+action = "store"
 
 [[Parameters]]
 paramName = "NumDays"

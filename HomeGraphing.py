@@ -386,16 +386,6 @@ def ShowGraph(graphDict):
     f.close()
     view(graphDict["outputFile"], new='tab')
 
-def GetConfigFilePath():
-    fp = os.path.join(ProgPath, 'secrets.ini')
-    if not os.path.isfile(fp):
-        fp = os.environ['PrivateConfig']
-        if not os.path.isfile(fp):
-            logger.error('No configuration file found: %s', fp)
-            sys.exit(1)
-    logger.info('Using configuration file at: %s', fp)
-    return fp
-
 def main():
     global DelOldCsv, SaveCSVData, DBHostDict, LocalDataOnly, DatabaseReadDelta, helperFunctionLoggingLevel, PP
 
@@ -413,6 +403,9 @@ def main():
         args = Prodict.from_dict(cfg)
         debug(f"MakeParams returns non None dictionary, so args (and PP) become: {args}")
         PP = Prodict.from_dict(cfg)
+    if PP.HtmlDirectory is None: PP.HtmlDirectory = ''
+    else: os.makedirs(PP.HtmlDirectory, exist_ok=True)
+
 
     debug(f"We have program configuration parameters: {cfg}")
     debug(f"We have program keyword parameters: {kwargs}")
@@ -480,6 +473,7 @@ def main():
             del GraphDefs[k]    # delete graph defs for undesired plots
             continue
         gd = GraphDefs[k]
+        gd['outputFile'] = os.path.join(PP.HtmlDirectory, gd['outputFile'])
         DBHosts.add(gd["DBHost"])
         numYAxes = len(gd['Yaxes'])
         for a in gd['Yaxes']:
@@ -567,13 +561,8 @@ def main():
     # logger.debug('DBHostDict is: %s' % json.dumps(DBHostDict, indent=2))
 
 if __name__ == "__main__":
-
-    setConsoleLoggingLevel(logging.INFO)
-
     logger.info(f'####################  {ProgName} starts  @  {dt.now().isoformat(sep=" ")}   #####################')
-    setConsoleLoggingLevel(helperFunctionLoggingLevel)
     main()
-    setConsoleLoggingLevel(logging.INFO)
     logger.info(f'####################  {ProgName} all done  @  {dt.now().isoformat(sep=" ")}   #####################')
     logging.shutdown()
     pass

@@ -622,7 +622,7 @@
       }    ],
     "items": [
       {
-        "query": "SELECT Time, volts AS Gateway, ROUND(Svd/Sd, 3) AS AveGateway FROM (SELECT RecTime AS Time, JSON_VALUE(message, '$.Battery') AS volts, SUM(JSON_VALUE(message, '$.Battery') * JSON_VALUE(message, '$.deltaT')) OVER (ORDER BY RecTime ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING) AS 'Svd', SUM(JSON_VALUE(message, '$.deltaT')) OVER (ORDER BY RecTime ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING) AS 'Sd' FROM `{my_schema}`.`mqttmessages` WHERE topic='Testing/Moteino/1' AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime) AS b",
+        "query": "SELECT Time, volts AS Gateway, ROUND(Svd/Sd, 3) AS AveGateway FROM (SELECT RecTime AS Time, JSON_VALUE(message, '$.Battery') AS volts, SUM(JSON_VALUE(message, '$.Battery') * JSON_VALUE(message, '$.deltaT')) OVER (ORDER BY RecTime ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) AS 'Svd', SUM(JSON_VALUE(message, '$.deltaT')) OVER (ORDER BY RecTime ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) AS 'Sd' FROM `{my_schema}`.`mqttmessages` WHERE topic='Testing/Moteino/1' AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime) AS b",
         "variableNames": ["Gateway Battery", "Ave Gateway Volts"],
         "datafile": "GatewayBattery.csv",
         "axisNum": 0,

@@ -1,0 +1,780 @@
+[RCTemps]
+GraphTitle = "Ridgecrest Temperatures"
+outputFile = "RCTemps.htm"
+DBHost = "RC"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[RCTemps.Yaxes]]
+title = "°F"
+[[RCTemps.items]]
+query = "SELECT date AS 'Time', tempf AS 'Outside', tempinf AS 'Computer' FROM `{my_schema}`.`rcweather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Outside", "Computer",]
+datafile = "RcWxTemps.csv"
+dataname = "Outside/Inside Temps"
+[[RCTemps.items]]
+query = "SELECT time AS 'Time', value AS 'Thermostat' FROM `{my_schema}`.`thermostat_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Thermostat",]
+datafile = "ThermostatTemps.csv"
+dataname = "THERMOSTAT TEMP"
+[[RCTemps.items]]
+query = "SELECT time AS 'Time', value AS 'Dining' FROM `{my_schema}`.`dining_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Dining",]
+datafile = "DiningTemps.csv"
+dataname = "DINING TEMP"
+[[RCTemps.items]]
+query = "SELECT time AS 'Time', value AS 'Guest' FROM `{my_schema}`.`guest_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Guest",]
+datafile = "GuestTemps.csv"
+dataname = "GUEST TEMP"
+[[RCTemps.items]]
+query = "SELECT time AS 'Time', value AS 'Kitchen' FROM `{my_schema}`.`kitchen_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Kitchen",]
+datafile = "KitchenTemps.csv"
+dataname = "KITCHEN TEMP"
+[[RCTemps.items]]
+query = "SELECT time AS 'Time', value AS 'Master' FROM `{my_schema}`.`master_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Master",]
+datafile = "MasterTemps.csv"
+dataname = "MASTER TEMP"
+[[RCTemps.items]]
+query = "SELECT time AS 'Time', value AS 'Living' FROM `{my_schema}`.`living_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Living",]
+datafile = "LivingTemps.csv"
+dataname = "LIVING TEMP"
+
+[RCHeaters]
+GraphTitle = "Ridgecrest Heaters"
+outputFile = "RCHeaters.htm"
+DBHost = "RC"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[RCHeaters.Yaxes]]
+title = "°F Temperature"
+[[RCHeaters.Yaxes]]
+title = "Watts"
+location = "right"
+[[RCHeaters.items]]
+query = "SELECT date AS 'Time', tempinf AS 'Computer' FROM `{my_schema}`.`rcweather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Computer",]
+datafile = "ComputerTemp.csv"
+axisNum = 0
+dataname = "COMPUTER TEMP"
+[[RCHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'Dining' FROM `{my_schema}`.`dining_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Dining",]
+datafile = "DiningTemps.csv"
+axisNum = 0
+dataname = "DINING TEMP"
+[[RCHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'Guest' FROM `{my_schema}`.`guest_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Guest",]
+datafile = "GuestTemps.csv"
+axisNum = 0
+dataname = "GUEST TEMP"
+[[RCHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'Kitchen' FROM `{my_schema}`.`kitchen_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Kitchen",]
+datafile = "KitchenTemps.csv"
+axisNum = 0
+dataname = "KITCHEN TEMP"
+[[RCHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'Master' FROM `{my_schema}`.`master_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Master",]
+datafile = "MasterTemps.csv"
+axisNum = 0
+dataname = "MASTER TEMP"
+[[RCHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'Living' FROM `{my_schema}`.`living_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Living",]
+datafile = "LivingTemps.csv"
+axisNum = 0
+dataname = "LIVING TEMP"
+[[RCHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'Computer' FROM `{my_schema}`.`computer_heater_power` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Computer",]
+datafile = "ComputerHeaterWatts.csv"
+axisNum = 1
+includeInLegend = false
+dataname = "COMPUTER HEATER POWER"
+[[RCHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'Dining' FROM `{my_schema}`.`dining_heater_power` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Dining",]
+datafile = "DiningHeaterWatts.csv"
+axisNum = 1
+includeInLegend = false
+dataname = "DINING HEATER POWER"
+[[RCHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'Guest' FROM `{my_schema}`.`guest_heater_power` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Guest",]
+datafile = "GuestHeaterWatts.csv"
+axisNum = 1
+includeInLegend = false
+dataname = "GUEST HEATER POWER"
+[[RCHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'Kitchen' FROM `{my_schema}`.`kitchen_heater_power` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Kitchen",]
+datafile = "KitchenHeaterWatts.csv"
+axisNum = 1
+includeInLegend = false
+dataname = "KITCHEN HEATER POWER"
+[[RCHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'Master' FROM `{my_schema}`.`master_heater_power` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Master",]
+datafile = "MasterHeaterWatts.csv"
+axisNum = 1
+includeInLegend = false
+dataname = "MASTER HEATER POWER"
+[[RCHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'Living' FROM `{my_schema}`.`living_heater_power` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Living",]
+datafile = "LivingHeaterWatts.csv"
+axisNum = 1
+includeInLegend = false
+dataname = "LIVING HEATER POWER"
+
+[RCHums]
+GraphTitle = "Ridgecrest Humidities"
+outputFile = "RCHums.htm"
+DBHost = "RC"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[RCHums.Yaxes]]
+title = "%"
+[[RCHums.items]]
+query = "SELECT date AS 'Time', humidity AS 'Outside', humidityin AS 'Computer' FROM `{my_schema}`.`rcweather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Outside", "Computer",]
+datafile = "RcWxHums.csv"
+dataname = "OUTSIDE / INSIDE HUMIDITY"
+[[RCHums.items]]
+query = "SELECT time AS 'Time', value AS 'Thermostat' FROM `{my_schema}`.`thermostat_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Thermostat",]
+datafile = "ThermostatHums.csv"
+dataname = "THERMOSTAT HUMIDITY"
+[[RCHums.items]]
+query = "SELECT time AS 'Time', value AS 'Dining' FROM `{my_schema}`.`dining_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Dining",]
+datafile = "DiningHums.csv"
+dataname = "DINING HUMIDITY"
+[[RCHums.items]]
+query = "SELECT time AS 'Time', value AS 'Guest' FROM `{my_schema}`.`guest_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Guest",]
+datafile = "GuestHums.csv"
+dataname = "GUEST HUMIDITY"
+[[RCHums.items]]
+query = "SELECT time AS 'Time', value AS 'Kitchen' FROM `{my_schema}`.`kitchen_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Kitchen",]
+datafile = "KitchenHums.csv"
+dataname = "KITCHEN HUMIDITY"
+[[RCHums.items]]
+query = "SELECT time AS 'Time', value AS 'Master' FROM `{my_schema}`.`master_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Master",]
+datafile = "MasterHums.csv"
+dataname = "MASTER HUMIDITY"
+[[RCHums.items]]
+query = "SELECT time AS 'Time', value AS 'Living' FROM `{my_schema}`.`living_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Living",]
+datafile = "LivingHums.csv"
+dataname = "LIVING HUMIDITY"
+[[RCHums.items]]
+query = "SELECT time AS 'Time', value AS 'Humidifier' FROM `{my_schema}`.`humidifier_power` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Humidifier",]
+datafile = "HumidifierPower.csv"
+dataname = "HUMIDIFIER POWER"
+
+[RCLaundry]
+GraphTitle = "Ridgecrest Laundry Trap"
+outputFile = "RCLaundry.htm"
+DBHost = "RC"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[RCLaundry.Yaxes]]
+title = "°F"
+[[RCLaundry.items]]
+query = "SELECT CollectionTime AS 'Time', TrapTemperature*9/5+32 AS 'Trap', HotWaterValveTemp*9/5+32 AS 'HW', ColdWaterValveTemp*9/5+32 AS 'CW', (1-HotWaterValveOFF)*10+20 AS 'HW Valve', (1-ColdWaterValveOFF)*10+15 AS 'CW Valve' FROM `{my_schema}`.`FreezeProtection` WHERE CollectionTime > '{BeginDate}' ORDER BY CollectionTime"
+variableNames = [ "Trap", "HW", "CW", "HW Valve", "CW Valve",]
+datafile = "LaundryTrap.csv"
+axisNum = 0
+dataname = "LAUNDRY TRAP"
+[[RCLaundry.items]]
+query = "SELECT date AS 'Time', tempf AS 'Outside' FROM `{my_schema}`.`rcweather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Outside",]
+datafile = "RcOutTemps.csv"
+axisNum = 0
+dataname = "OUTSIDE TEMP"
+
+[RCPower]
+GraphTitle = "Ridgecrest House Power"
+outputFile = "RCPower.htm"
+DBHost = "RC"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[RCPower.Yaxes]]
+title = "Watts"
+[[RCPower.items]]
+query = "SELECT Time AS 'Time', HousePowerW AS 'House' FROM `{my_schema}`.`MeterData` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "House",]
+datafile = "HousePower.csv"
+axisNum = 0
+dataname = "HOUSE POWER"
+[[RCPower.items]]
+query = "SELECT time AS 'Time', value AS 'Humidifier' FROM `{my_schema}`.`humidifier_power` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Humidifier",]
+datafile = "HumidifierPower.csv"
+dataname = "HUMIDIFIER POWER"
+[[RCPower.items]]
+query = "SELECT time AS 'Time', value AS 'Refrigerator' FROM `{my_schema}`.`fridge_power` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Refrigerator",]
+datafile = "FridgePower.csv"
+dataname = "FRIDGE POWER"
+[[RCPower.items]]
+query = "SELECT time AS 'Time', value AS 'A/C Power' FROM `{my_schema}`.`ac_power` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "A/C Power",]
+datafile = "ACPower.csv"
+dataname = "A/C POWER"
+[[RCPower.items]]
+query = "SELECT time AS 'Time', value AS 'Solar HW' FROM `{my_schema}`.`solar_hw_power` WHERE time > '{BeginDate}' AND value > 0 AND value < 4000 ORDER BY time"
+variableNames = [ "Solar HW",]
+datafile = "SolarHWPower.csv"
+dataname = "SOLAR HW POWER"
+[[RCPower.items]]
+query = "SELECT time AS 'Time', value*.2 AS 'LR Light' FROM `{my_schema}`.`lrlight_power` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "LR Light",]
+datafile = "LRLight.csv"
+lineType = "step"
+dataname = "LR LIGHT POWER"
+[RCPower.items.lineMods]
+"glyph.line_width" = "2"
+"muted_glyph.line_width" = "4"
+"glyph.mode" = "'after'"
+"muted_glyph.mode" = "'after'"
+
+[RCSolar]
+GraphTitle = "Ridgecrest Solar"
+outputFile = "RCSolar.htm"
+DBHost = "RC"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[RCSolar.Yaxes]]
+title = "Watts"
+[[RCSolar.Yaxes]]
+title = "W/m^2"
+color_map = "red"
+color = "red"
+location = "right"
+[[RCSolar.items]]
+query = "SELECT Time AS 'Time', OutWattsNow AS 'North Array' FROM `{my_schema}`.`SolarEnergy` WHERE Name = 'North Array' AND Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "North Array",]
+datafile = "NorthArray.csv"
+axisNum = 0
+dataname = "NORTH SOLAR"
+[[RCSolar.items]]
+query = "SELECT Time AS 'Time', OutWattsNow AS 'South Array' FROM `{my_schema}`.`SolarEnergy` WHERE Name = 'South Array' AND Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "South Array",]
+datafile = "SouthArray.csv"
+axisNum = 0
+dataname = "SOUTH SOLAR"
+[[RCSolar.items]]
+query = "SELECT Time AS 'Time', W AS 'Watts' FROM `{my_schema}`.`solarinverter_102` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Watts",]
+datafile = "RCSolar.csv"
+axisNum = 0
+dataname = "RIDGECREST SOLAR"
+[[RCSolar.items]]
+query = "SELECT date AS 'Time', solarradiation as SolarRad FROM `{my_schema}`.`rcweather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "SolarRad",]
+datafile = "SolarRad.csv"
+axisNum = 1
+dataname = "SOLAR RADIATION"
+
+[RCWater]
+GraphTitle = "Ridgecrest Water"
+outputFile = "RCWater.htm"
+DBHost = "RC"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[RCWater.Yaxes]]
+title = "Gallons Per Minute"
+[[RCWater.Yaxes]]
+title = "Watts"
+color_map = "red"
+color = "red"
+location = "right"
+[[RCWater.items]]
+query = "SELECT Time AS 'Time', GPM AS 'Gallons/Min' FROM `{my_schema}`.`MeterData` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Gallons/Min",]
+datafile = "GPM.csv"
+axisNum = 0
+dataname = "RC Water Usage"
+[[RCWater.items]]
+query = "SELECT Time AS 'Time', WaterEnable AS 'MasterValveON' FROM `{my_schema}`.`MeterData` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "MasterValveON",]
+datafile = "MasterValveON.csv"
+axisNum = 0
+dataname = "RC Master Valve ON"
+[[RCWater.items]]
+query = "SELECT Time AS 'Time', AvgWaterPowerW AS 'Well Power' FROM `{my_schema}`.`MeterData` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Well Power",]
+datafile = "WellPower.csv"
+axisNum = 1
+dataname = "RC Water Power"
+
+[SSFurnace]
+GraphTitle = "Steamboat Furnace"
+outputFile = "SSFurnace.htm"
+DBHost = "SS"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[SSFurnace.Yaxes]]
+title = " "
+[[SSFurnace.items]]
+query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Temperature'), 1) AS 'Temp', round(json_value(message, '$.Humidity'), 1) AS 'Humidity', (json_value(message, '$.Burner') = 'ON')*20+20 AS 'Furnace', (json_value(message, '$.MotionDetected') = 'ON')*10+15 AS 'Motion' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c70fc9/data' AND  RecTime  > '{BeginDate}' AND RecTime  < now(6) AND json_value(message, '$.Temperature') < 150 AND json_value(message, '$.Humidity') < 110 ORDER BY RecTime"
+variableNames = [ "Temp", "Humidity", "Furnace", "Motion",]
+datafile = "SSFurnace.csv"
+axisNum = 0
+dataname = "SS Furnace"
+
+[SSMasterWindow]
+GraphTitle = "Steamboat Master Window"
+outputFile = "SSMasterWindow.htm"
+DBHost = "SS"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[SSMasterWindow.Yaxes]]
+title = "Light Value"
+color = "purple"
+color_map = "Purples"
+[[SSMasterWindow.Yaxes]]
+title = "UV"
+color_map = "Reds"
+color = "red"
+location = "right"
+[[SSMasterWindow.Yaxes]]
+title = "°F"
+color = "blue"
+color_map = "Blues"
+location = "left"
+[[SSMasterWindow.Yaxes]]
+title = "% RH"
+color = "green"
+color_map = "Greens"
+location = "right"
+[[SSMasterWindow.items]]
+query = "SELECT RecTime AS 'Time', json_value(message, '$.LightLevel') * 0.4 AS 'Light' FROM `{my_schema}`.`mqttmessages` WHERE ((topic='a020a6135ed9/data' AND RecTime < '2019-11-16 17:00') OR (topic='3c71bf36eb61/data' AND RecTime > '2019-11-16 16:39'))  AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Light",]
+datafile = "SSMasterWindowLight.csv"
+axisNum = 0
+dataname = "SS Master Window Light"
+[[SSMasterWindow.items]]
+query = "SELECT date AS 'Time', solarradiation AS 'Outside Light' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Outside",]
+datafile = "SSWeatherLight.csv"
+axisNum = 0
+dataname = "SS OUTSIDE LIGHT"
+[[SSMasterWindow.items]]
+query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Temperature'), 1) AS 'Window Temp' FROM `{my_schema}`.`mqttmessages` WHERE ((topic='a020a6135ed9/data' AND RecTime < '2019-11-16 17:00') OR (topic='3c71bf36eb61/data' AND RecTime > '2019-11-16 16:39'))  AND json_value(message, '$.Temperature') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "MasterWindowTemp",]
+datafile = "SSMasterWindowTemp.csv"
+axisNum = 2
+dataname = "SS Master Window Temperature"
+[[SSMasterWindow.items]]
+query = "SELECT time AS 'Time', value AS 'Room Temp' FROM `{my_schema}`.`master_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "MasterTemp",]
+datafile = "SSMasterTemps.csv"
+axisNum = 2
+dataname = "MASTER TEMP"
+[[SSMasterWindow.items]]
+query = "SELECT date AS 'Time', tempf AS 'Outside Temp' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Outside",]
+datafile = "SSOutTemps.csv.csv"
+axisNum = 2
+dataname = "SS OUTSIDE TEMPS"
+[[SSMasterWindow.items]]
+query = "SELECT date AS 'Time', uv AS 'Out UV' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Out UV",]
+datafile = "SSWeatherUv.csv"
+axisNum = 1
+dataname = "SS OUTSIDE UV"
+[[SSMasterWindow.items]]
+query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Humidity'), 1) AS 'Humidity' FROM `{my_schema}`.`mqttmessages` WHERE ((topic='a020a6135ed9/data' AND RecTime < '2019-11-16 17:00') OR (topic='3c71bf36eb61/data' AND RecTime > '2019-11-16 16:39')) AND RecTime  > '{BeginDate}' AND RecTime  < now(6) AND json_value(message, '$.Humidity') < 110 ORDER BY RecTime"
+variableNames = [ "Humidity",]
+datafile = "SSMasterWindowHumidity.csv"
+axisNum = 3
+dataname = "SS Master Window"
+
+[SSOfficeWindow]
+GraphTitle = "Steamboat Office Window"
+outputFile = "SSOfficeWindow.htm"
+DBHost = "SS"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[SSOfficeWindow.Yaxes]]
+title = "Light Value"
+color = "purple"
+color_map = "Purples"
+location = "left"
+[[SSOfficeWindow.Yaxes]]
+title = "UV"
+color_map = "Reds"
+color = "red"
+location = "right"
+[[SSOfficeWindow.Yaxes]]
+title = "°F"
+color = "blue"
+color_map = "Blues"
+location = "left"
+[[SSOfficeWindow.Yaxes]]
+title = "% RH"
+color = "green"
+color_map = "Greens"
+location = "right"
+[[SSOfficeWindow.items]]
+query = "SELECT RecTime AS 'Time', json_value(message, '$.LightLevel') * .4 AS 'Light' FROM `{my_schema}`.`mqttmessages` WHERE (topic='3c71bf36ea05/data') AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Light",]
+datafile = "SSOfficeWindowLight.csv"
+axisNum = 0
+dataname = "SS Office Window Light"
+[[SSOfficeWindow.items]]
+query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Temperature'), 1) AS 'Temp' FROM `{my_schema}`.`mqttmessages` WHERE (topic='3c71bf36ea05/data') AND json_value(message, '$.Temperature') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Temp",]
+datafile = "SSOfficeWindowTemp.csv"
+axisNum = 2
+dataname = "SS Office Window Temperature"
+[[SSOfficeWindow.items]]
+query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Humidity'), 1) AS 'Humidity' FROM `{my_schema}`.`mqttmessages` WHERE (topic='3c71bf36ea05/data') AND RecTime  > '{BeginDate}' AND RecTime  < now(6) AND json_value(message, '$.Humidity') < 110 ORDER BY RecTime"
+variableNames = [ "Humidity",]
+datafile = "SSOfficeWindowHumidity.csv"
+axisNum = 3
+dataname = "SS Office Window"
+[[SSOfficeWindow.items]]
+query = "SELECT date AS 'Time', tempf AS 'Outside Temp' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Outside",]
+datafile = "SSOutTemps.csv.csv"
+axisNum = 2
+dataname = "SS OUTSIDE TEMPS"
+[[SSOfficeWindow.items]]
+query = "SELECT date AS 'Time', solarradiation AS 'Outside Light' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Outside",]
+datafile = "SSWeatherLight.csv"
+axisNum = 0
+dataname = "SS OUTSIDE LIGHT"
+[[SSOfficeWindow.items]]
+query = "SELECT date AS 'Time', uv AS 'Out UV' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Out UV",]
+datafile = "SSWeatherUv.csv"
+axisNum = 1
+dataname = "SS OUTSIDE UV"
+
+[SSSolar]
+GraphTitle = "Steamboat Solar"
+outputFile = "SSSolar.htm"
+DBHost = "SS"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[SSSolar.Yaxes]]
+title = "Watts"
+[[SSSolar.Yaxes]]
+title = "W/m^2"
+color_map = "red"
+color = "red"
+location = "right"
+[[SSSolar.items]]
+query = "SELECT `Time` AS 'Time', `W` AS 'Watts' FROM `{my_schema}`.`solarinverter_102` WHERE W >= -1 AND Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Solar Array",]
+datafile = "SolarArray.csv"
+axisNum = 0
+dataname = "STEAMBOAT SOLAR"
+[[SSSolar.items]]
+query = "SELECT date AS 'Time', solarradiation AS 'Outside' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Outside",]
+datafile = "SSWeatherLight.csv"
+axisNum = 1
+dataname = "SS OUTSIDE LIGHT"
+
+[SSMoteino]
+GraphTitle = "Steamboat Moteino Batteries"
+outputFile = "SSBattery.htm"
+DBHost = "SS"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[SSMoteino.Yaxes]]
+title = "Volts"
+[[SSMoteino.items]]
+query = "SELECT Time, volts AS Gateway, ROUND(Svd/Sd, 3) AS AveGateway FROM (SELECT RecTime AS Time, JSON_VALUE(message, '$.Battery') AS volts, SUM(JSON_VALUE(message, '$.Battery') * JSON_VALUE(message, '$.deltaT')) OVER (ORDER BY RecTime ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) AS 'Svd', SUM(JSON_VALUE(message, '$.deltaT')) OVER (ORDER BY RecTime ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) AS 'Sd' FROM `{my_schema}`.`mqttmessages` WHERE topic='Testing/Moteino/1' AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime) AS b"
+variableNames = [ "Gateway Battery", "Ave Gateway Volts",]
+datafile = "GatewayBattery.csv"
+axisNum = 0
+dataname = "MOTEINO GATEWAY BATTERY"
+
+[SSTemps]
+GraphTitle = "Steamboat Temperatures"
+outputFile = "SSTemps.htm"
+DBHost = "SS"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[SSTemps.Yaxes]]
+title = "°F"
+[[SSTemps.items]]
+query = "SELECT time AS 'Time', value AS 'Master' FROM `{my_schema}`.`master_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Master",]
+datafile = "SSMasterTemps.csv"
+dataname = "MASTER TEMP"
+[[SSTemps.items]]
+query = "SELECT RecTime AS 'Time', json_value(message, '$.Temperature') AS 'Master Window' FROM `{my_schema}`.`mqttmessages` WHERE ((topic='a020a6135ed9/data' AND RecTime < '2019-11-16 17:00') OR (topic='3c71bf36eb61/data' AND RecTime > '2019-11-16 16:39')) AND json_value(message, '$.Temperature') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "MasterWindow",]
+datafile = "SSMasterWindowTemps.csv"
+dataname = "MASTER WINDOW TEMP"
+[[SSTemps.items]]
+query = "SELECT RecTime AS 'Time', json_value(message, '$.Temperature') AS 'Guest' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c704c5/data' AND json_value(message, '$.Temperature') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Guest",]
+datafile = "SSGuestTemps.csv"
+dataname = "GUEST TEMP"
+[[SSTemps.items]]
+query = "SELECT time AS 'Time', value AS 'Computer' FROM `{my_schema}`.`computer_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Computer",]
+datafile = "SSComputerTemps.csv"
+dataname = "COMPUTER TEMP"
+[[SSTemps.items]]
+query = "SELECT date AS 'Time', tempf AS 'Outside', tempinf AS 'Hallway' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Outside", "Hallway",]
+datafile = "SSWeatherTemps.csv"
+axisNum = 0
+dataname = "SS OUTSIDE/INSIDE TEMPS"
+[[SSTemps.items]]
+query = "SELECT time AS 'Time', value AS 'Living' FROM `{my_schema}`.`living_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Living",]
+datafile = "SSLivingTemps.csv"
+dataname = "LIVING TEMP"
+[[SSTemps.items]]
+query = "SELECT time AS 'Time', value AS 'Kitchen' FROM `{my_schema}`.`kitchen_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Kitchen",]
+datafile = "SSKitchenTemps.csv"
+dataname = "KITCHEN TEMP"
+[[SSTemps.items]]
+query = "SELECT time AS 'Time', value AS 'Mud' FROM `{my_schema}`.`mud_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Mud",]
+datafile = "SSMudTemps.csv"
+dataname = "MUD TEMP"
+[[SSTemps.items]]
+query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Temperature'), 1) AS 'Garage' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c70fc9/data' AND json_value(message, '$.Temperature') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Garage",]
+datafile = "SSGarageTemp.csv"
+dataname = "SS GARAGE TEMPERATURE"
+[[SSTemps.items]]
+query = "SELECT RecTime AS 'Time', (json_value(message, '$.Fan') = 'ON')*20+20 AS 'Fan' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c70fc9/data' AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Fan",]
+datafile = "SSFurnaceFan.csv"
+dataname = "SS FURNACE FAN"
+
+[SSLights]
+GraphTitle = "Steamboat Light"
+outputFile = "SSLight.htm"
+DBHost = "SS"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[SSLights.Yaxes]]
+title = "W/m^2"
+[[SSLights.Yaxes]]
+title = "UV"
+color_map = "red"
+color = "red"
+location = "right"
+[[SSLights.items]]
+query = "SELECT time AS 'Time', value AS 'Master' FROM `{my_schema}`.`master_light` WHERE time > '{BeginDate}' AND value < 2000 AND value >= 0 ORDER BY time"
+variableNames = [ "Master",]
+datafile = "SSMasterLight.csv"
+dataname = "MASTER LIGHT"
+[[SSLights.items]]
+query = "SELECT RecTime AS 'Time', json_value(message, '$.LightLevel') * 0.4 AS 'Master Window' FROM `{my_schema}`.`mqttmessages` WHERE ((topic='a020a6135ed9/data' AND RecTime < '2019-11-16 17:00') OR (topic='3c71bf36eb61/data' AND RecTime > '2019-11-16 16:39')) AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "MasterWindow",]
+datafile = "SSMasterWindowLight.csv"
+dataname = "MASTER WINDOW LIGHT"
+[[SSLights.items]]
+query = "SELECT time AS 'Time', value AS 'Computer' FROM `{my_schema}`.`computer_light` WHERE time > '{BeginDate}' AND value < 2000 AND value >= 0 ORDER BY time"
+variableNames = [ "Computer",]
+datafile = "SSComputerLight.csv"
+dataname = "COMPUTER Light"
+[[SSLights.items]]
+query = "SELECT date AS 'Time', solarradiation AS 'Outside' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Outside",]
+datafile = "SSWeatherLight.csv"
+axisNum = 0
+dataname = "SS OUTSIDE LIGHT"
+[[SSLights.items]]
+query = "SELECT date AS 'Time', uv AS 'Out UV' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Out UV",]
+datafile = "SSWeatherUv.csv"
+axisNum = 1
+dataname = "SS OUTSIDE UV"
+[[SSLights.items]]
+query = "SELECT time AS 'Time', value AS 'Living' FROM `{my_schema}`.`living_light` WHERE time > '{BeginDate}' AND value < 2000 AND value >= 0 ORDER BY time"
+variableNames = [ "Living",]
+datafile = "SSLivingLight.csv"
+dataname = "LIVING LIGHT"
+[[SSLights.items]]
+query = "SELECT time AS 'Time', value AS 'Kitchen' FROM `{my_schema}`.`kitchen_light` WHERE time > '{BeginDate}' AND value < 2000 AND value >= 0 ORDER BY time"
+variableNames = [ "Kitchen",]
+datafile = "SSKitchenLight.csv"
+dataname = "KITCHEN LIGHT"
+[[SSLights.items]]
+query = "SELECT time AS 'Time', value AS 'Mud' FROM `{my_schema}`.`mud_light` WHERE time > '{BeginDate}' AND value < 2000 AND value >= 0 ORDER BY time"
+variableNames = [ "Mud",]
+datafile = "SSMudLight.csv"
+dataname = "MUD LIGHT"
+
+[SSMotion]
+GraphTitle = "Steamboat Motion"
+outputFile = "SSMotion.htm"
+DBHost = "SS"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[SSMotion.Yaxes]]
+title = "Motion"
+[[SSMotion.items]]
+query = "SELECT RecTime AS 'Time', (json_value(message, '$.MotionDetected') = 'ON')*16 AS 'Master Window' FROM `{my_schema}`.`mqttmessages` WHERE ((topic='a020a6135ed9/data' AND RecTime < '2019-11-16 17:00') OR (topic='3c71bf36eb61/data' AND RecTime > '2019-11-16 16:39')) AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Master Window",]
+datafile = "SSMasterWindowMotion.csv"
+lineType = "step"
+dataname = "SS MASTER WINDOW MOTION"
+[SSMotion.items.lineMods]
+"glyph.line_width" = "2"
+"muted_glyph.line_width" = "4"
+"glyph.mode" = "'after'"
+"muted_glyph.mode" = "'after'"
+[[SSMotion.items]]
+query = "SELECT time AS 'Time', (value != 0)*15 AS 'Master' FROM `{my_schema}`.`master_motion` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Master",]
+datafile = "SSMasterMotion.csv"
+lineType = "step"
+dataname = "SS MASTER MOTION"
+[SSMotion.items.lineMods]
+"glyph.line_width" = "2"
+"muted_glyph.line_width" = "4"
+"glyph.mode" = "'after'"
+"muted_glyph.mode" = "'after'"
+[[SSMotion.items]]
+query = "SELECT RecTime AS 'Time', (json_value(message, '$.MotionDetected') = 'ON')*14 AS 'Guest' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c704c5/data' AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Guest",]
+datafile = "SSGuestMotion.csv"
+lineType = "step"
+dataname = "SS GUEST MOTION"
+[SSMotion.items.lineMods]
+"glyph.line_width" = "2"
+"muted_glyph.line_width" = "4"
+"glyph.mode" = "'after'"
+"muted_glyph.mode" = "'after'"
+[[SSMotion.items]]
+query = "SELECT time AS 'Time', (value != 0)*13 AS 'Computer' FROM `{my_schema}`.`computer_motion` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Computer",]
+datafile = "SSComputerMotion.csv"
+lineType = "step"
+dataname = "SS COMPUTER MOTION"
+[SSMotion.items.lineMods]
+"glyph.line_width" = "2"
+"muted_glyph.line_width" = "4"
+"glyph.mode" = "'after'"
+"muted_glyph.mode" = "'after'"
+[[SSMotion.items]]
+query = "SELECT time AS 'Time', (value != 0)*12 AS 'Living' FROM `{my_schema}`.`living_motion` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Living",]
+datafile = "SSLivingMotion.csv"
+lineType = "step"
+dataname = "SS LIVING MOTION"
+[SSMotion.items.lineMods]
+"glyph.line_width" = "2"
+"muted_glyph.line_width" = "4"
+"glyph.mode" = "'after'"
+"muted_glyph.mode" = "'after'"
+[[SSMotion.items]]
+query = "SELECT time AS 'Time', (value != 0)*11 AS 'Kitchen' FROM `{my_schema}`.`kitchen_motion` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Kitchen",]
+datafile = "SSKitchenMotion.csv"
+lineType = "step"
+dataname = "SS KITCHEN MOTION"
+[SSMotion.items.lineMods]
+"glyph.line_width" = "2"
+"muted_glyph.line_width" = "4"
+"glyph.mode" = "'after'"
+"muted_glyph.mode" = "'after'"
+[[SSMotion.items]]
+query = "SELECT time AS 'Time', (value != 0)*10 AS 'Mud' FROM `{my_schema}`.`mud_motion` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Mud",]
+datafile = "SSMudMotion.csv"
+lineType = "step"
+dataname = "SS MUD MOTION"
+[SSMotion.items.lineMods]
+"glyph.line_width" = "2"
+"muted_glyph.line_width" = "4"
+"glyph.mode" = "'after'"
+"muted_glyph.mode" = "'after'"
+[[SSMotion.items]]
+query = "SELECT RecTime AS 'Time', (json_value(message, '$.MotionDetected') = 'ON')*9 AS 'Garage' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c70fc9/data' AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Garage",]
+datafile = "SSGarageMotion.csv"
+lineType = "step"
+dataname = "SS GARAGE MOTION"
+[SSMotion.items.lineMods]
+"glyph.line_width" = "2"
+"muted_glyph.line_width" = "4"
+"glyph.mode" = "'after'"
+"muted_glyph.mode" = "'after'"
+
+[SSHums]
+GraphTitle = "Steamboat Humidities"
+outputFile = "SSHums.htm"
+DBHost = "SS"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[SSHums.Yaxes]]
+title = "°F"
+[[SSHums.items]]
+query = "SELECT time AS 'Time', value AS 'Master' FROM `{my_schema}`.`master_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Master",]
+datafile = "SSMasterHums.csv"
+dataname = "MASTER HUMIDITY"
+[[SSHums.items]]
+query = "SELECT RecTime AS 'Time', ROUND(json_value(message, '$.Humidity'),1) AS 'Master Window' FROM `{my_schema}`.`mqttmessages` WHERE ((topic='a020a6135ed9/data' AND RecTime < '2019-11-16 17:00') OR (topic='3c71bf36eb61/data' AND RecTime > '2019-11-16 16:39')) AND json_value(message, '$.Humidity') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Master Window",]
+datafile = "SSMasterWindowHumidity.csv"
+dataname = "SS MASTER WINDOW HUMIDITY"
+[[SSHums.items]]
+query = "SELECT RecTime AS 'Time', json_value(message, '$.Humidity') AS 'Guest' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c704c5/data' AND json_value(message, '$.Humidity') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Guest",]
+datafile = "SSGuestHums.csv"
+dataname = "GUEST HUMIDITY"
+[[SSHums.items]]
+query = "SELECT time AS 'Time', value AS 'Computer' FROM `{my_schema}`.`computer_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Computer",]
+datafile = "SSComputerHums.csv"
+dataname = "COMPUTER HUMIDITY"
+[[SSHums.items]]
+query = "SELECT date AS 'Time', humidityin AS 'Hallway' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Hallway",]
+datafile = "SSHallwayHums.csv"
+axisNum = 0
+dataname = "SS HALLWAY INSIDE HUMIDITY"
+[[SSHums.items]]
+query = "SELECT time AS 'Time', value AS 'Living' FROM `{my_schema}`.`living_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Living",]
+datafile = "SSLivingHums.csv"
+dataname = "SS LIVING HUMIDITY"
+[[SSHums.items]]
+query = "SELECT time AS 'Time', value AS 'Kitchen' FROM `{my_schema}`.`kitchen_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Kitchen",]
+datafile = "SSKitchenHums.csv"
+dataname = "KITCHEN HUMIDITY"
+[[SSHums.items]]
+query = "SELECT time AS 'Time', value AS 'Mud' FROM `{my_schema}`.`mud_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Mud",]
+datafile = "SSMudHums.csv"
+dataname = "MUD HUMIDITY"
+[[SSHums.items]]
+query = "SELECT RecTime AS 'Time', ROUND(json_value(message, '$.Humidity'),1) AS 'Garage' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c70fc9/data' AND json_value(message, '$.Humidity') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Garage",]
+datafile = "SSGarageHumidity.csv"
+lineType = "step"
+dataname = "SS GARAGE HUMIDITY"
+[SSHums.items.lineMods]
+"glyph.line_width" = "2"
+"muted_glyph.line_width" = "4"
+"glyph.mode" = "'after'"
+"muted_glyph.mode" = "'after'"

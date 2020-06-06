@@ -499,11 +499,17 @@ XaxisTitle = "Date/Time"
 [[SSMoteino.Yaxes]]
 title = "Volts"
 [[SSMoteino.items]]
-query = "SELECT Time, volts AS Gateway, ROUND(Svd/Sd, 3) AS AveGateway FROM (SELECT RecTime AS Time, JSON_VALUE(message, '$.Battery') AS volts, SUM(JSON_VALUE(message, '$.Battery') * JSON_VALUE(message, '$.deltaT')) OVER (ORDER BY RecTime ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) AS 'Svd', SUM(JSON_VALUE(message, '$.deltaT')) OVER (ORDER BY RecTime ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) AS 'Sd' FROM `{my_schema}`.`mqttmessages` WHERE topic='Testing/Moteino/1' AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime) AS b"
+query = "SELECT Time, volts AS Gateway, ROUND(Svd/Sd, 3) AS AveGateway FROM (SELECT RecTime AS Time, JSON_VALUE(message, '$.Battery') AS volts, SUM(JSON_VALUE(message, '$.Battery') * JSON_VALUE(message, '$.deltaT')) OVER (ORDER BY RecTime ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) AS 'Svd', SUM(JSON_VALUE(message, '$.deltaT')) OVER (ORDER BY RecTime ROWS BETWEEN 5 PRECEDING AND 5 FOLLOWING) AS 'Sd' FROM `{my_schema}`.`mqttmessages` WHERE (topic='Testing/Moteino/1' OR topic='Testing/Moteino/g1 OR topic='Moteino/g1') AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime) AS b"
 variableNames = [ "Gateway Battery", "Ave Gateway Volts",]
 datafile = "GatewayBattery.csv"
 axisNum = 0
 dataname = "MOTEINO GATEWAY BATTERY"
+[[SSMoteino.items]]
+query = "SELECT RecTime AS Time, JSON_VALUE(message, '$.Battery') AS Motion8 FROM `{my_schema}`.`mqttmessages` WHERE (topic='Testing/Moteino/E8' OR topic='Moteino/E8') AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Motion8 Battery", ]
+datafile = "Motion8Battery.csv"
+axisNum = 0
+dataname = "MOTEINO MOTION8 BATTERY"
 
 [SSTemps]
 GraphTitle = "Steamboat Temperatures"

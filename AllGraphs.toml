@@ -484,6 +484,13 @@ datafile = "SolarArray.csv"
 axisNum = 0
 dataname = "STEAMBOAT SOLAR"
 [[SSSolar.items]]
+query = "SELECT `Time` AS 'Time', IF(`Instantaneous_Power`<0,`Instantaneous_Power`*-1000.0, NULL) AS 'Battery Discharge Watts', IF(`Instantaneous_Power`>=0,`Instantaneous_Power`*1000.0, NULL) AS 'Battery Charge Watts' FROM `{my_schema}`.`solarinverter_LgStatus` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Battery Discharge", "Battery Charge",]
+datafile = "BatteryCharging.csv"
+axisNum = 0
+dataname = "STEAMBOAT SOLAR Battery Charge State"
+
+[[SSSolar.items]]
 query = "SELECT date AS 'Time', solarradiation AS 'Outside' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
 variableNames = [ "Outside",]
 datafile = "SSWeatherLight.csv"

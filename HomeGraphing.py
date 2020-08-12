@@ -213,7 +213,7 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
             logger.debug('sql data index:\n%s', data.index)
             if CSVdataRead:
                 #  Have SQL data and have CSV data, put them together
-                data =  fdata.append(data)
+                data =  fdata.append(data, sort=True)
                 logger.debug('appended data tail:\n%s', data.tail())
                 logger.debug('appended data dtypes:\n%s', data.dtypes)
                 logger.debug('appended data columns:\n%s', data.columns)

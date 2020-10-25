@@ -179,7 +179,7 @@ type = "float"
 
 [[Parameters]]
 paramName = "GraphDefsFileName"     #  file name only, will look in various places to find it.
-description = "Name of graph definition file."
+description = "Name of graph definition file, if no extension, will try .toml, .json, .jsonc ."
 configName = "graph_defs_file_name"
 default = "AllGraphs"
 type = "str"

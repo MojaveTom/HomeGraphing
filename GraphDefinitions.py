@@ -103,9 +103,11 @@ def GetGraphDefs(GraphDefFile=None, *args, **kwargs):
     else:
         if GraphDefFile is None: GraphDefFile = "OneLineGraph"
         # Look for .toml, .jsonc and .json files with GraphDefFile in the main program's dir then in cwd.
-        fns = [   os.path.join(ProgPath, f"{GraphDefFile}*.toml")
+        fns = [   os.path.join(ProgPath, f"{GraphDefFile}")     # First try un-adorned file name
+                , os.path.join(ProgPath, f"{GraphDefFile}*.toml")
                 , os.path.join(ProgPath, f"{GraphDefFile}*.jsonc")
                 , os.path.join(ProgPath, f"{GraphDefFile}*.json")
+                , f"{GraphDefFile}"
                 , f"{GraphDefFile}*.toml"
                 , f"{GraphDefFile}*.jsonc"
                 , f"{GraphDefFile}*.json"

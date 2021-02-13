@@ -132,7 +132,7 @@ def main():
     parser = argparse.ArgumentParser(
         description='Retrieve weather data from Ambient.net.')
     parser.add_argument("-o", "--oldData", dest="desiredFirst", action="store", help="Set desired first database date.")
-    parser.add_argument("-s", "--holeSize", dest="holeSize", action="store", help="If specified, look for holes in weather data bigger than this AND try to fill them.")
+    parser.add_argument("-s", "--holeSize", dest="holeSize", action="store", help="If specified, look for holes in weather data bigger than this (minutes) AND try to fill them.")
     parser.add_argument("-n", "--nullHoles", dest="doNull", action="store_true", help="Fill remaining holes with NULL records so hole won't be found again.")
     parser.add_argument("-W", "--dontWriteToDB", dest="noWriteDb", action="store_true", default=False, help="Don't write to database [during debug defaults to True].")
     parser.add_argument("-v", "--verbosity", dest="verbosity",

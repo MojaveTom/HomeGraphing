@@ -66,6 +66,8 @@ debug = logger.debug
 info = logger.info
 critical = logger.critical
 
+logger.level = logging.DEBUG
+
 helperFunctionLoggingLevel = logging.WARNING
 
 #########################################
@@ -161,85 +163,85 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
     DBConn = hostParams['conn']
 
     slicer = 'index > "%s"'%(beginDate + dataTimeOffsetUTC).isoformat()     # pandas "query" to remove old data FROM csv data
-    logger.info('slicer = %s', slicer)
+    info('slicer = %s', slicer)
 
     SQLbeginDate = beginDate        # initial value; changed later if CSV data read
 
-    logger.debug('call args -- fileName: %s, DBConn: %s, query: %s', fileName, DBConn, query)
-    logger.debug('beginDate = %s dataTimeOffsetUTC = %s', beginDate, dataTimeOffsetUTC)
+    debug('call args -- fileName: %s, DBConn: %s, query: %s', fileName, DBConn, query)
+    debug('beginDate = %s dataTimeOffsetUTC = %s', beginDate, dataTimeOffsetUTC)
     theFile = os.path.join(CsvFilesPath, fileName)
-    logger.info('theFile: %s', theFile)
+    info('theFile: %s', theFile)
     CSVdataRead = False     # flag is true if we read csv data
     if  os.path.exists(theFile):
         if DelOldCsv:
             os.remove(theFile)
-            logger.info('CSV file deleted.')
+            info('CSV file deleted.')
             fdata = None
         else:
             fdata = pd.read_csv(theFile, index_col=0, parse_dates=True)
-            logger.debug('Num Points from CSV = %s', fdata.size)
+            debug('Num Points from CSV = %s', fdata.size)
             if (fdata.size <= 0):
-                logger.info("CSV file exists but has no data.")
+                info("CSV file exists but has no data.")
                 fdata = None
             elif (beginDate is not None) and (fdata.index[0] > beginDate):
-                logger.debug("CSV data all more recent than desired data; ignore it.")
+                debug("CSV data all more recent than desired data; ignore it.")
                 fdata = None
             else:
                 SQLbeginDate = fdata.index[-1]
-                logger.debug('Last CSV time = new beginDate = %s', beginDate)
-                logger.debug('CSVdata tail:\n%s', fdata.tail())
-                logger.debug('CSVdata dtypes:\n%s', fdata.dtypes)
-                logger.debug('CSVdata columns:\n%s', fdata.columns)
-                logger.debug('CSVdata index:\n%s', fdata.index)
+                debug('Last CSV time = new beginDate = %s', beginDate)
+                debug('CSVdata tail:\n%s', fdata.tail())
+                debug('CSVdata dtypes:\n%s', fdata.dtypes)
+                debug('CSVdata columns:\n%s', fdata.columns)
+                debug('CSVdata index:\n%s', fdata.index)
                 CSVdataRead = True
     else:
         logger.warning('CSV file "%s" does not exist.'%theFile)
         fdata = None
         pass
-    logger.debug('SQLbeginDate after CSV modified for SQL = %s', SQLbeginDate)
-    logger.debug("Comparing: now UTC time: %s and UTC data time: %s", dt.utcnow(), (SQLbeginDate - dataTimeOffsetUTC))
+    debug('SQLbeginDate after CSV modified for SQL = %s', SQLbeginDate)
+    debug("Comparing: now UTC time: %s and UTC data time: %s", dt.utcnow(), (SQLbeginDate - dataTimeOffsetUTC))
     if ((not CSVdataRead) or (dt.utcnow() - SQLbeginDate + dataTimeOffsetUTC) > timedelta(minutes=DatabaseReadDelta)) and DBConn and query:
-        logger.debug('SQLbeginDate for creating SQL query %s', SQLbeginDate)
+        debug('SQLbeginDate for creating SQL query %s', SQLbeginDate)
         myQuery = query.format(BeginDate=SQLbeginDate.isoformat())
-        logger.info('SQL query: %s', myQuery)
+        info('SQL query: %s', myQuery)
         data = pd.read_sql_query(myQuery, DBConn, index_col='Time')
         if data.index.size != 0:
                 # Have SQL data
-            logger.debug('Num Points from SQL = %s', data.index.size)
-            logger.debug('sql data head:\n%s', data.head())
-            logger.debug('sql data tail:\n%s', data.tail())
-            logger.debug('sql data dtypes:\n%s', data.dtypes)
-            logger.debug('sql data columns:\n%s', data.columns)
-            logger.debug('sql data index:\n%s', data.index)
+            debug('Num Points from SQL = %s', data.index.size)
+            debug('sql data head:\n%s', data.head())
+            debug('sql data tail:\n%s', data.tail())
+            debug('sql data dtypes:\n%s', data.dtypes)
+            debug('sql data columns:\n%s', data.columns)
+            debug('sql data index:\n%s', data.index)
             if CSVdataRead:
                 #  Have SQL data and have CSV data, put them together
                 data =  fdata.append(data, sort=True)
-                logger.debug('appended data tail:\n%s', data.tail())
-                logger.debug('appended data dtypes:\n%s', data.dtypes)
-                logger.debug('appended data columns:\n%s', data.columns)
-                logger.debug('appended data index:\n%s', data.index)
+                debug('appended data tail:\n%s', data.tail())
+                debug('appended data dtypes:\n%s', data.dtypes)
+                debug('appended data columns:\n%s', data.columns)
+                debug('appended data index:\n%s', data.index)
                 pass
             else:
-                logger.debug('No CSV data to which to append SQL data.')
+                debug('No CSV data to which to append SQL data.')
                 pass    # No CSV data in fdata; SQL data in data
         else:
             # No SQL data
-            logger.debug('No Sql data read.')
+            debug('No Sql data read.')
             if CSVdataRead:
                 # Have CSV data, no SQL data; copy CSV data to output dataFrame
                 data = fdata
             else:
-                logger.debug('No CSV data AND no SQL data!!')
+                debug('No CSV data AND no SQL data!!')
                 pass    # No CSV data, no SQL data:  punt??
             pass
     else:
         if DBConn and query:
-            logger.info("CSV data is recent enough; don't query database. ")
-            logger.debug("now %s SQLbeginDate %s diff %s", dt.utcnow(), SQLbeginDate, (dt.utcnow() - SQLbeginDate))
+            info("CSV data is recent enough; don't query database. ")
+            debug("now %s SQLbeginDate %s diff %s", dt.utcnow(), SQLbeginDate, (dt.utcnow() - SQLbeginDate))
         elif LocalDataOnly:
-            logger.debug('Using local data only; no database data desired.  No SQL data.')
+            debug('Using local data only; no database data desired.  No SQL data.')
         else:
-            logger.debug('No database parameters defined; no SQL data.')
+            debug('No database parameters defined; no SQL data.')
         data = fdata
         pass
 
@@ -260,7 +262,7 @@ def ShowGraph(graphDict):
         return
 
     if (len(graphDict['Yaxes']) <= 0) or (len(graphDict['items']) <= 0):
-        logger.debug('No axes or no lines defined for graph "%s"', graphDict['GraphTitle'])
+        debug('No axes or no lines defined for graph "%s"', graphDict['GraphTitle'])
         return
 
     if graphDict['DBHost'] not in DBHostDict.keys():
@@ -324,7 +326,7 @@ def ShowGraph(graphDict):
 
     for i in range(len(graphDict['items'])):
         item = graphDict['items'][i]
-        logger.info('--------------  %s  ------------' % item['dataname'])
+        info('--------------  %s  ------------' % item['dataname'])
         ya = graphDict['Yaxes'][item['axisNum']]
         colorGroup = ya['title']
         query = item['query'].format(
@@ -341,17 +343,17 @@ def ShowGraph(graphDict):
             logger.warning('item "%s" of graph "%s" has no data and is skipped.' % (item['dataname'], graphDict['GraphTitle']))
             continue
         else:
-            logger.debug('Got %s rows of data.' % data.size)
+            debug('Got %s rows of data.' % data.size)
         data = ColumnDataSource(data)
-        logger.debug('data column names are: %s; num rows is:  %s' % (data.column_names, data.to_df().size))
+        debug('data column names are: %s; num rows is:  %s' % (data.column_names, data.to_df().size))
         yRangeName = 'Y%s_axis' % item['axisNum']
         for thisCol in data.column_names[1:]:
-            logger.debug('Column "%s" is plotted against y axis: "%s"' % (thisCol, yRangeName))
+            debug('Column "%s" is plotted against y axis: "%s"' % (thisCol, yRangeName))
             itemColor = item["color"]
             if item["color"] is None:
                 itemColor = ya['cmap'].nextColor(colorGroup)
             else:
-                logger.debug('item color "%s" is defined in the item definition.' % itemColor)
+                debug('item color "%s" is defined in the item definition.' % itemColor)
             r = eval('''plot.%s(x=data.column_names[0]
                 , y = thisCol
                 , source=data
@@ -361,7 +363,7 @@ def ShowGraph(graphDict):
                 , y_range_name=yRangeName)'''%item['lineType'])
             for (k, v) in item['lineMods'].items():
                 s = 'r.%s = %s'%(k, v)
-                logger.debug('Executing line mod "%s"' % s)
+                debug('Executing line mod "%s"' % s)
                 exec(s)
             extra_y_ranges[yRangeName].renderers.append(r)
             if item['includeInLegend']: legend.items.append(LegendItem(label=thisCol, renderers=[r]))
@@ -406,6 +408,8 @@ def main():
     if PP.HtmlDirectory is None: PP.HtmlDirectory = ''
     else: os.makedirs(PP.HtmlDirectory, exist_ok=True)
 
+    helperFunctionLoggingLevel = PP.DefaultLoggingLevel
+    setConsoleLoggingLevel(helperFunctionLoggingLevel)      # Update to arg value in case function changed it.
 
     debug(f"We have program configuration parameters: {cfg}")
     debug(f"We have program keyword parameters: {kwargs}")
@@ -418,7 +422,7 @@ def main():
     DatabaseReadDelta = float(args.DatabaseReadDelta)
 
     desired_plots = set()
-    logger.debug('There are %s plot items specified on the command line.' % len(args.plots))
+    debug('There are %s plot items specified on the command line.' % len(args.plots))
     # # "flatten" and add args.plot items to desired_plots
     # from itertools import chain
     # flatten = chain.from_iterable
@@ -427,20 +431,20 @@ def main():
     # desired_plots = set(flatten([args.plots,]))
     for i in range(len(args.plots)):
         itm = args.plots[i]
-        logger.debug('Plots item %s is %s' % (i, itm))
+        debug('Plots item %s is %s' % (i, itm))
         if len(itm) > 0:
             if isinstance(itm, str):
-                logger.debug('plots item is a str: "%s"' % itm)
+                debug('plots item is a str: "%s"' % itm)
                 desired_plots.add(itm)
             elif isinstance(itm, list):
-                logger.debug('plots item is a list')
+                debug('plots item is a list')
                 for j in itm:
                     desired_plots.add(j)
 
-    logger.debug('Desired plots is: %s'%(desired_plots,))
+    debug('Desired plots is: %s'%(desired_plots,))
 
 #    allKnownPlots = SSGraphs.union(RCGraphs)
-    logger.info('Using graph definitions from "%s"'%args.GraphDefsFileName)
+    info('Using graph definitions from "%s"'%args.GraphDefsFileName)
     GraphDefs, _ = GetGraphDefs(args.GraphDefsFileName, loggingLevel=helperFunctionLoggingLevel)
 
     #  Here we compute some helper fields in the GraphDefs dictionary.
@@ -448,7 +452,7 @@ def main():
     # with a bunch of imports and code it doesn't need to do its job.
     DBHosts = set()
     gdks = set(GraphDefs.keys())
-    logger.debug('Graphs defined in the graph defs file are: %s' % gdks)
+    debug('Graphs defined in the graph defs file are: %s' % gdks)
     if len(desired_plots) > 0:
         plotlist = list(desired_plots)
         for plt in plotlist:
@@ -457,18 +461,18 @@ def main():
                 desired_plots.remove(plt)
     if len(desired_plots) == 0:     # no options given, and no config graphs, provide a default set.
         desired_plots = gdks        # all graphs
-        logger.debug('No known plots specified on command line; plot all known.')
-    logger.info('Desired plots set is: %s', desired_plots)
-    logger.info('Command line contains RC graphs: %s', not RCGraphs.isdisjoint(desired_plots))
-    logger.info('Command line contains SS graphs: %s', not SSGraphs.isdisjoint(desired_plots))
+        debug('No known plots specified on command line; plot all known.')
+    info('Desired plots set is: %s', desired_plots)
+    info('Command line contains RC graphs: %s', not RCGraphs.isdisjoint(desired_plots))
+    info('Command line contains SS graphs: %s', not SSGraphs.isdisjoint(desired_plots))
 
     desired_plots = desired_plots.intersection(gdks)
     if len(desired_plots) == 0:
-        logger.debug('No desired plots are defined in the graph defs file.')
+        debug('No desired plots are defined in the graph defs file.')
         exit(4)
-    logger.debug('Desired plots set after checking the graph defs file is: %s', desired_plots)
+    debug('Desired plots set after checking the graph defs file is: %s', desired_plots)
     for k in gdks:
-        logger.debug('Checking if desired plot "%s" is defined.' % k)
+        debug('Checking if desired plot "%s" is defined.' % k)
         if k not in desired_plots:
             del GraphDefs[k]    # delete graph defs for undesired plots
             continue
@@ -492,13 +496,13 @@ def main():
         logger.warning('None of the desired plots are in the graph definitions file.')
         exit(3)
     gdks = sorted(GraphDefs.keys())
-    logger.debug('Sorted list of graphs (from GraphDefs.keys): %s' % gdks)
+    debug('Sorted list of graphs (from GraphDefs.keys): %s' % gdks)
 
-    # logger.debug('GraphDefs dict is: %s' % json.dumps(GraphDefs, indent=2))
+    # debug('GraphDefs dict is: %s' % json.dumps(GraphDefs, indent=2))
     if LocalDataOnly:
         ServerTimeFromUTC = dt.utcnow() - dt.now()      # Use current system as database host for time purposes.
         for h in DBHosts:       # create "dummy" host entry
-            logger.debug('Creating "dummy" host entry for %s' % h)
+            debug('Creating "dummy" host entry for %s' % h)
             DBHostDict[h] = dict()
             dbhd = DBHostDict[h]
             dbhd['DBEngine'] = None
@@ -508,13 +512,13 @@ def main():
             dbhd['twoWeeksAgo'] = (dt.utcnow() + ServerTimeFromUTC - timedelta(days=14))
             dbhd['BeginTime'] = (dt.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
             dbhd['ServerTimeFromUTC'] = ServerTimeFromUTC
-            logger.debug("%s Server time offset from UTC: %s" % (h, dbhd['ServerTimeFromUTC']))
-            logger.debug("%s BeginTime: %s" % (h, dbhd['BeginTime']))
-            logger.debug("%s twoWeeksAgo: %s" % (h, dbhd['twoWeeksAgo']))
+            debug("%s Server time offset from UTC: %s" % (h, dbhd['ServerTimeFromUTC']))
+            debug("%s BeginTime: %s" % (h, dbhd['BeginTime']))
+            debug("%s twoWeeksAgo: %s" % (h, dbhd['twoWeeksAgo']))
         # Datetime objects are not JSON serializable; don't dump host dict.
-        # logger.debug('Dummy DBHostDict is: %s' % json.dumps(DBHostDict, indent=2))
+        # debug('Dummy DBHostDict is: %s' % json.dumps(DBHostDict, indent=2))
         for k in gdks:
-            logger.info('             ##############   Preparing graph "%s"   #################' % k)
+            info('             ##############   Preparing graph "%s"   #################' % k)
             ShowGraph(GraphDefs[k])
         return
 
@@ -527,20 +531,20 @@ def main():
         port = cfg[f'{h}_database_port']
         dbhd['haschema'] = cfg[f'{h}_ha_schema']
         dbhd['myschema'] = cfg[f'{h}_my_schema']
-        logger.info(f"{h} user {user}")
-        logger.info(f"{h} pwd {pwd}")
-        logger.info(f"{h} host {host}")
-        logger.info(f"{h} port {port}")
-        logger.info(f"{h} haschema {dbhd['haschema']}")
-        logger.info(f"{h} myschema {dbhd['myschema']}")
+        info(f"{h} user {user}")
+        info(f"{h} pwd {pwd}")
+        info(f"{h} host {host}")
+        info(f"{h} port {port}")
+        info(f"{h} haschema {dbhd['haschema']}")
+        info(f"{h} myschema {dbhd['myschema']}")
 
         # schema in connection string is not important since all queries specify the
         #   schema for the table being accessed.
         connstr = 'mysql+pymysql://{user}:{pwd}@{host}:{port}/{schema}'.format(user=user, pwd=pwd, host=host, port=port, schema=dbhd['haschema'])
-        logger.debug("%s database connection string: %s" % (h, connstr))
+        debug("%s database connection string: %s" % (h, connstr))
         Eng = create_engine(connstr, echo = True if Verbosity>=2 else False, logging_name = logger.name)
         dbhd['DBEngine'] = Eng
-        logger.debug(Eng)
+        debug(Eng)
         with Eng.connect() as conn, conn.begin():
             dbhd['conn'] = conn
             result = conn.execute("select timestampdiff(hour, utc_timestamp(), now());")
@@ -549,20 +553,20 @@ def main():
             dbhd['twoWeeksAgo'] = (dt.utcnow() + ServerTimeFromUTC - timedelta(days=14))
             dbhd['BeginTime'] = (dt.utcnow() + ServerTimeFromUTC - timedelta(days=numDays))
             dbhd['ServerTimeFromUTC'] = ServerTimeFromUTC
-            logger.debug("%s Server time offset from UTC: %s" % (h, dbhd['ServerTimeFromUTC']))
-            logger.debug("%s BeginTime: %s" % (h, dbhd['BeginTime']))
-            logger.debug("%s twoWeeksAgo: %s" % (h, dbhd['twoWeeksAgo']))
+            debug("%s Server time offset from UTC: %s" % (h, dbhd['ServerTimeFromUTC']))
+            debug("%s BeginTime: %s" % (h, dbhd['BeginTime']))
+            debug("%s twoWeeksAgo: %s" % (h, dbhd['twoWeeksAgo']))
             for k in gdks:
                 gd = GraphDefs[k]
                 if gd["DBHost"] == h:
-                    logger.info(f'             ##############   Preparing graph "{k}"   #################')
+                    info(f'             ##############   Preparing graph "{k}"   #################')
                     ShowGraph(GraphDefs[k])
         # "DBEngine" and "conn" items in DBHostDict are not serializable, so can't dump them
-    # logger.debug('DBHostDict is: %s' % json.dumps(DBHostDict, indent=2))
+    # debug('DBHostDict is: %s' % json.dumps(DBHostDict, indent=2))
 
 if __name__ == "__main__":
-    logger.info(f'####################  {ProgName} starts  @  {dt.now().isoformat(sep=" ")}   #####################')
+    info(f'####################  {ProgName} starts  @  {dt.now().isoformat(sep=" ")}   #####################')
     main()
-    logger.info(f'####################  {ProgName} all done  @  {dt.now().isoformat(sep=" ")}   #####################')
+    info(f'####################  {ProgName} all done  @  {dt.now().isoformat(sep=" ")}   #####################')
     logging.shutdown()
     pass

@@ -17,6 +17,16 @@ action = "append_const"
 const = "RCLaundry"
 
 [[Parameters]]
+paramName = "RCBooster"
+description = "Show Ridgecrest Pressure Booster graph."
+intermediate = true
+[Parameters.argParserArgs]
+short = "-b"
+dest = "plots"
+action = "append_const"
+const = "RCBooster"
+
+[[Parameters]]
 paramName = "RCSolar"
 description = "Show Ridgecrest Solar graph."
 intermediate = true

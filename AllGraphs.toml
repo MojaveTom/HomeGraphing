@@ -202,6 +202,38 @@ datafile = "RcOutTemps.csv"
 axisNum = 0
 dataname = "OUTSIDE TEMP"
 
+[RCBooster]
+GraphTitle = "Ridgecrest Pressure Booster"
+outputFile = "RCBooster.htm"
+DBHost = "RC"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[RCBooster.Yaxes]]
+title = "psig"
+[[RCBooster.Yaxes]]
+title = "°F"
+color_map = "red"
+color = "red"
+location = "right"
+[[RCBooster.items]]
+query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Pressure'), 1) AS 'Press' FROM `{my_schema}`.`mqttmessages` WHERE topic='e8db84e569cf/data' AND  RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Press",]
+datafile = "PressBoosterPress.csv"
+axisNum = 0
+dataname = "PRESSURE BOOSTER PRESSURE"
+[[RCBooster.items]]
+query = "SELECT Time AS 'Time', duration as PumpRun FROM `{my_schema}`.`pump_data` WHERE Time  > '{BeginDate}' AND Time  < now(6) ORDER BY id"
+variableNames = [ "PumpRun", ]
+datafile = "PressBoosterPump.csv"
+axisNum = 0
+dataname = "PRESSURE BOOSTER PUMP"
+[[RCBooster.items]]
+query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Temperature'), 1) AS 'Temp' FROM `{my_schema}`.`mqttmessages` WHERE topic='e8db84e569cf/data' AND  RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Temp",]
+datafile = "PressBoosterTemp.csv"
+axisNum = 1
+dataname = "PRESSURE BOOSTER TEMPERATURE"
+
 [RCPower]
 GraphTitle = "Ridgecrest House Power"
 outputFile = "RCPower.htm"

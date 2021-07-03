@@ -33,6 +33,7 @@ import pymysql as mysql             #   https://pymysql.readthedocs.io/en/latest
 from pymysql.err import Error as DbError    #   https://github.com/PyMySQL/PyMySQL/blob/master/pymysql/err.py
 from ambient_api import ambientapi  #   https://ambientweather.docs.apiary.io/#
 from math import ceil as ceil       #   https://docs.python.org/3/library/math.html
+import paho.mqtt.publish as publish
 
 
 ProgName, ext = os.path.splitext(os.path.basename(sys.argv[0]))
@@ -73,7 +74,10 @@ def GetConfigFilePath():
 
 #######################   GLOBALS   ########################
 ServerTimeFromUTC = timedelta(hours=0)
-RequiredConfigParams = frozenset(('ambient_endpoint', 'ambient_api_key', 'ambient_application_key', 'inserter_host', 'inserter_schema', 'inserter_port', 'inserter_user', 'inserter_password', 'weather_table'))
+RequiredConfigParams = frozenset(('ambient_endpoint', 'ambient_api_key', 'ambient_application_key',
+                                  'inserter_host', 'inserter_schema', 'inserter_port', 'inserter_user', 
+                                  'inserter_password', 'weather_table', 
+                                  'mqtt_host', 'mqtt_port', 'mqtt_weather_topic', 'mqtt_weather_items'))
 
 DBConn = None
 dontWriteDb = True
@@ -132,7 +136,7 @@ def main():
     parser = argparse.ArgumentParser(
         description='Retrieve weather data from Ambient.net.')
     parser.add_argument("-o", "--oldData", dest="desiredFirst", action="store", help="Set desired first database date.")
-    parser.add_argument("-s", "--holeSize", dest="holeSize", action="store", help="If specified, look for holes in weather data bigger than this AND try to fill them.")
+    parser.add_argument("-s", "--holeSize", dest="holeSize", action="store", help="If specified, look for holes in weather data bigger than this (minutes) AND try to fill them.")
     parser.add_argument("-n", "--nullHoles", dest="doNull", action="store_true", help="Fill remaining holes with NULL records so hole won't be found again.")
     parser.add_argument("-W", "--dontWriteToDB", dest="noWriteDb", action="store_true", default=False, help="Don't write to database [during debug defaults to True].")
     parser.add_argument("-v", "--verbosity", dest="verbosity",
@@ -166,8 +170,13 @@ def main():
     app_key = cfg['ambient_application_key']
     weather_table = cfg['weather_table']
     myWeatherDevice = cfg['MAC_address']
+    mqtt_host = cfg['mqtt_host']
+    mqtt_port = int(cfg['mqtt_port'])
+    mqtt_weather_topic = cfg['mqtt_weather_topic']
+    mqtt_weather_items = cfg['mqtt_weather_items'].split()
 
     logger.debug('host: %s, port: %d, user: %s, pwd: %s, schema: %s'%(host, port, user, pwd, myschema))
+    logger.debug(f'mqtt_host: {mqtt_host}, mqtt_port: {mqtt_port}, mqtt_weather_topic: {mqtt_weather_topic}, mqtt_weather_items: {mqtt_weather_items}')
 
     DBConn = mysql.connect(host=host, port=port, user=user, password=pwd, database=myschema, binary_prefix=True, charset='utf8mb4')
     logger.debug('DBConn is: %s'%DBConn)
@@ -264,6 +273,16 @@ def main():
                         break
                 else:
                     logger.debug('Did NOT write to database.')
+            # The first item in wdata is the most recent; publish it via MQTT.
+            weatherMsg = {}
+            for weatherItem in mqtt_weather_items:
+                weatherMsg[weatherItem] = wdata[0][weatherItem]
+            weatherMsg = json.dumps(weatherMsg)
+            publish.single(mqtt_weather_topic, 
+                            payload=weatherMsg,
+                            hostname=mqtt_host,
+                            port=mqtt_port)
+            logger.debug(f'Published weather msg: {weatherMsg}')
         else:
             logger.info("No new weather data retrieved.")
 

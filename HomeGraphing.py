@@ -377,7 +377,7 @@ def ShowGraph(graphDict):
             , ( '',   '@Time{%F %T}'   )
             ],
             formatters={
-                'Time' : 'datetime' # use 'datetime' formatter for 'x' field
+                '@Time' : 'datetime' # use 'datetime' formatter for 'x' field
                                         # use default 'numeral' formatter for other fields
             }))
 

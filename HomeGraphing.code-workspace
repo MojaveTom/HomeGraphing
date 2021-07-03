@@ -19,7 +19,8 @@
 				"database": "demay_farm",
 				"username": "tom"
 			}
-		]
+		],
+		"python.pythonPath": "/usr/bin/python3"
 	},
 	"python.autoComplete.extraPaths": [
 		"/Volumes/UsersData/tom/usr/local/lib/python3.7/site-packages/bokeh",

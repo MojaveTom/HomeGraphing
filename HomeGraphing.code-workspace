@@ -4,7 +4,23 @@
 			"path": "."
 		}
 	],
-	"settings": {},
+	"settings": {
+		"sqltools.connections": [
+			{
+				"mysqlOptions": {
+					"authProtocol": "default"
+				},
+				"previewLimit": 50,
+				"server": "192.168.195.70",
+				"port": 3306,
+				"askForPassword": true,
+				"driver": "MariaDB",
+				"name": "RCLogger",
+				"database": "demay_farm",
+				"username": "tom"
+			}
+		]
+	},
 	"python.autoComplete.extraPaths": [
 		"/Volumes/UsersData/tom/usr/local/lib/python3.7/site-packages/bokeh",
 

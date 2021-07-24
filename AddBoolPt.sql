@@ -5,13 +5,13 @@
  *    newTime: DATETIME(6)  The timestamp for the newly inserted data point.
  *    newval:  BOOLEAN      The value of the state of the pump running (true if running).
  *
- *  Session Vars passed in:
+ *  Session Vars created/used inside:
  *    @theId      The id of the last row in the pump_data table.
  *    @prevVal    The state of the pump in the last row in the pump_data table.
  *    @iDm1       The id of the second to last row in the pump_data table.
  *    @prevTm1    The time of the second to last row in the pump_data table.
  *
- *  Unused session Vars passed in:
+ *  Unused session Vars used inside:
  *    @iD         = @theId
  *    @prevT      The time of the last row in the pump_data table.
  *                  Gets updated every time a new point is added to mqttmessages.
@@ -28,19 +28,11 @@ DELIMITER $$
 
 CREATE OR REPLACE PROCEDURE add_pt_to_Pump ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
     BEGIN
-        /*
-        CREATE TABLE IF NOT EXISTS `demay_farm`.`BoolTableTemplate`
-        (
-            Id BIGINT AUTO_INCREMENT PRIMARY KEY, -- primary key column
-            Time DATETIME(6),
-            value BOOLEAN,
-            duration FLOAT
-        );
-        */
         SET @newT = newTime;
         SET @newV = newval;
-
-        -- CREATE TABLE IF NOT EXISTS `demay_farm`.`pump_data` LIKE `demay_farm`.`BoolTableTemplate`;
+        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
+        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
+        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
 
         SELECT count(*) INTO @rowCount FROM `demay_farm`.`pump_data`;
         IF @rowCount > 1 THEN
@@ -57,81 +49,54 @@ CREATE OR REPLACE PROCEDURE add_pt_to_Pump ( newTime DATETIME(6), newval BOOLEAN
         END IF;
     END;
 $$
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE OR REPLACE PROCEDURE add_pt_to_Play ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
+    BEGIN
+        SET @newT = newTime;
+        SET @newV = newval;
+        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`play_data`;
+        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`play_data` WHERE Id = @theId LIMIT 1;
+        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`play_data` WHERE Id = @theId - 1 LIMIT 1;
+
+        SELECT count(*) INTO @rowCount FROM `demay_farm`.`play_data`;
+        IF @rowCount > 1 THEN
+            UPDATE `demay_farm`.`play_data` SET Time = @newT WHERE Id = @theId;
+            SET @dur = UNIX_TIMESTAMP(@newT) - UNIX_TIMESTAMP(@prevTm1);
+            UPDATE `demay_farm`.`play_data` SET duration = @dur WHERE Id >= @iDm1;
+            IF (@prevVal != @newV) THEN
+                INSERT INTO `demay_farm`.`play_data` VALUES (DEFAULT, @newT, @newV, 0);
+                INSERT INTO `demay_farm`.`play_data` VALUES (DEFAULT, TIMESTAMPADD(MICROSECOND, 1, @newT), @newV, 0);
+            END IF;
+        ELSE
+            -- select "Inserting", "first rows.";
+            INSERT INTO `demay_farm`.`play_data` VALUES (DEFAULT, @newT, @newV, 0);
+        END IF;
+    END;
+$$
 
 DELIMITER ;
 
 /*
 
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:30:00.123456', 0); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:31:00.123456', 0); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:32:00.123456', 1); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:33:00.123456', 1); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:34:00.123456', 1); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:35:00.123456', 1); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:36:00.123456', 0); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:37:00.123456', 0); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:38:00.123456', 0); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:39:00.123456', 0); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:45:00.123456', 0); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:46:00.123456', 0); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:47:00.123456', 0); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:48:00.123456', 0); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:52:00.123456', 1); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:53:00.123456', 1); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:54:00.123456', 1); SELECT * FROM pump_data;
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
-CALL add_pt_to_Pump('2021-06-04 10:55:00.123456', 1); SELECT * FROM pump_data;
+CALL add_pt_to_Play('2021-06-04 10:30:00.123456', 0); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:31:00.123456', 0); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:32:00.123456', 1); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:33:00.123456', 1); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:34:00.123456', 1); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:35:00.123456', 1); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:36:00.123456', 0); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:37:00.123456', 0); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:38:00.123456', 0); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:39:00.123456', 0); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:45:00.123456', 0); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:46:00.123456', 0); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:47:00.123456', 0); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:48:00.123456', 0); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:52:00.123456', 1); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:53:00.123456', 1); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:54:00.123456', 1); SELECT * FROM play_data;
+CALL add_pt_to_Play('2021-06-04 10:55:00.123456', 1); SELECT * FROM play_data;
 --*/

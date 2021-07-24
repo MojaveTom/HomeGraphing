@@ -25,9 +25,6 @@ DELIMITER |
 CREATE OR REPLACE TRIGGER UpdateBoolVals AFTER INSERT ON `demay_farm`.`mqttmessages` FOR EACH ROW
 BEGIN
     IF NEW.topic = 'dc4f220da30c/data' OR NEW.topic = 'e8db84e569cf/data' THEN
-        SELECT MAX(Id) INTO @theId FROM `demay_farm`.`pump_data`;
-        SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`pump_data` WHERE Id = @theId LIMIT 1;
-        SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`pump_data` WHERE Id = @theId - 1 LIMIT 1;
         CALL add_pt_to_Pump(NEW.rectime, (json_value(NEW.message, '$.PumpRun') = 'ON') );
     END IF;
 END;

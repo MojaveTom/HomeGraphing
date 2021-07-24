@@ -222,7 +222,7 @@ datafile = "PressBoosterPress.csv"
 axisNum = 0
 dataname = "PRESSURE BOOSTER PRESSURE"
 [[RCBooster.items]]
-query = "SELECT Time AS 'Time', duration as PumpRun FROM `{my_schema}`.`pump_data` WHERE Time  > '{BeginDate}' AND Time  < now(6) ORDER BY id"
+query = "SELECT Time AS 'Time', duration*value as PumpRun FROM `{my_schema}`.`pump_data` WHERE Time  > '{BeginDate}' AND Time  < now(6) ORDER BY id"
 variableNames = [ "PumpRun", ]
 datafile = "PressBoosterPump.csv"
 axisNum = 0

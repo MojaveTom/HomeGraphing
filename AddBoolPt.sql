@@ -1,3 +1,29 @@
+/*
+ *  Call this procedure each time a new row of pressure booster pump data is added to the
+ *  mqttmessages table.  It updates the pump_data table with extracted information.
+ *  Args:
+ *    newTime: DATETIME(6)  The timestamp for the newly inserted data point.
+ *    newval:  BOOLEAN      The value of the state of the pump running (true if running).
+ *
+ *  Session Vars passed in:
+ *    @theId      The id of the last row in the pump_data table.
+ *    @prevVal    The state of the pump in the last row in the pump_data table.
+ *    @iDm1       The id of the second to last row in the pump_data table.
+ *    @prevTm1    The time of the second to last row in the pump_data table.
+ *
+ *  Unused session Vars passed in:
+ *    @iD         = @theId
+ *    @prevT      The time of the last row in the pump_data table.
+ *                  Gets updated every time a new point is added to mqttmessages.
+ *    @prevValm1  The state of the pump in the second to last row in the pump_data table.
+ *
+ *  The duration column in the pump_data table is updated to reflect the duration that
+ *  the pump has been in the same state.  When the pump state changes, two rows are added
+ *  to the table with the time of the second advanced by one microsecond (to keep the rows
+ *  in the same order whether sorted by time or id).  The duration of both added rows is
+ *  zero, but will be updated when the next pump data comes in.
+ */
+
 DELIMITER $$
 
 CREATE OR REPLACE PROCEDURE add_pt_to_Pump ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
@@ -19,17 +45,11 @@ CREATE OR REPLACE PROCEDURE add_pt_to_Pump ( newTime DATETIME(6), newval BOOLEAN
         SELECT count(*) INTO @rowCount FROM `demay_farm`.`pump_data`;
         IF @rowCount > 1 THEN
             UPDATE `demay_farm`.`pump_data` SET Time = @newT WHERE Id = @theId;
-            IF (@prevVal = 0) and (newval = 1) THEN
+            SET @dur = UNIX_TIMESTAMP(@newT) - UNIX_TIMESTAMP(@prevTm1);
+            UPDATE `demay_farm`.`pump_data` SET duration = @dur WHERE Id >= @iDm1;
+            IF (@prevVal != @newV) THEN
                 INSERT INTO `demay_farm`.`pump_data` VALUES (DEFAULT, @newT, @newV, 0);
-                INSERT INTO `demay_farm`.`pump_data` VALUES (DEFAULT, @newT, @newV, 0);
-            ELSEIF (@prevVal = 1) and (newval = 1) THEN
-                SET @dur = UNIX_TIMESTAMP(newTime) - UNIX_TIMESTAMP(@prevTm1);
-                UPDATE `demay_farm`.`pump_data` SET duration = @dur WHERE Id >= @iDm1;
-            ELSEIF (@prevVal = 1) and (newval = 0) THEN
-                SET @dur = UNIX_TIMESTAMP(newTime) - UNIX_TIMESTAMP(@prevTm1);
-                UPDATE `demay_farm`.`pump_data` SET duration = @dur WHERE Id >= @iDm1;
-                INSERT INTO `demay_farm`.`pump_data` VALUES (DEFAULT, @newT, @newV, 0);
-                INSERT INTO `demay_farm`.`pump_data` VALUES (DEFAULT, @newT, @newV, 0);
+                INSERT INTO `demay_farm`.`pump_data` VALUES (DEFAULT, TIMESTAMPADD(MICROSECOND, 1, @newT), @newV, 0);
             END IF;
         ELSE
             -- select "Inserting", "first rows.";

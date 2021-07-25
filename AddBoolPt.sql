@@ -80,7 +80,7 @@ $$
 DELIMITER ;
 
 /*
-
+CREATE TABLE Play_data like BoolTableTemplate;
 CALL add_pt_to_Play('2021-06-04 10:30:00.123456', 0); SELECT * FROM play_data;
 CALL add_pt_to_Play('2021-06-04 10:31:00.123456', 0); SELECT * FROM play_data;
 CALL add_pt_to_Play('2021-06-04 10:32:00.123456', 1); SELECT * FROM play_data;
@@ -99,4 +99,6 @@ CALL add_pt_to_Play('2021-06-04 10:52:00.123456', 1); SELECT * FROM play_data;
 CALL add_pt_to_Play('2021-06-04 10:53:00.123456', 1); SELECT * FROM play_data;
 CALL add_pt_to_Play('2021-06-04 10:54:00.123456', 1); SELECT * FROM play_data;
 CALL add_pt_to_Play('2021-06-04 10:55:00.123456', 1); SELECT * FROM play_data;
+
+DROP TABLE IF EXISTS Play_data;
 --*/

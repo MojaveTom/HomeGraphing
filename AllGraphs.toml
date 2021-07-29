@@ -211,28 +211,40 @@ XaxisTitle = "Date/Time"
 [[RCBooster.Yaxes]]
 title = "psig"
 [[RCBooster.Yaxes]]
-title = "°F"
-color_map = "red"
-color = "red"
+title = "°F and % hum"
+color_map = "Blues"
+color = "blue"
 location = "right"
+[[RCBooster.Yaxes]]
+title = "Sec"
+color_map = "Greens"
+color = "green"
+location = "left"
 [[RCBooster.items]]
-query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Pressure'), 1) AS 'Press' FROM `{my_schema}`.`mqttmessages` WHERE topic='e8db84e569cf/data' AND  RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Pressure'), 1) AS 'Press' FROM `{my_schema}`.`mqttmessages` WHERE topic='dc4f220da30c/data' AND  RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
 variableNames = [ "Press",]
 datafile = "PressBoosterPress.csv"
 axisNum = 0
+color = "black"
 dataname = "PRESSURE BOOSTER PRESSURE"
 [[RCBooster.items]]
 query = "SELECT Time AS 'Time', duration*value as PumpRun FROM `{my_schema}`.`pump_data` WHERE Time  > '{BeginDate}' AND Time  < now(6) ORDER BY id"
 variableNames = [ "PumpRun", ]
 datafile = "PressBoosterPump.csv"
-axisNum = 0
+axisNum = 2
 dataname = "PRESSURE BOOSTER PUMP"
 [[RCBooster.items]]
-query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Temperature'), 1) AS 'Temp' FROM `{my_schema}`.`mqttmessages` WHERE topic='e8db84e569cf/data' AND  RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Temperature'), 1) AS 'Temp' FROM `{my_schema}`.`mqttmessages` WHERE topic='dc4f220da30c/data' AND  RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
 variableNames = [ "Temp",]
 datafile = "PressBoosterTemp.csv"
 axisNum = 1
 dataname = "PRESSURE BOOSTER TEMPERATURE"
+[[RCBooster.items]]
+query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Humidity'), 1) AS 'Humidity' FROM `{my_schema}`.`mqttmessages` WHERE topic='dc4f220da30c/data' AND  RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Humidity",]
+datafile = "PressBoosterHumidity.csv"
+axisNum = 1
+dataname = "PRESSURE BOOSTER HUMIDITY"
 
 [RCPower]
 GraphTitle = "Ridgecrest House Power"
@@ -290,7 +302,7 @@ XaxisTitle = "Date/Time"
 title = "Watts"
 [[RCSolar.Yaxes]]
 title = "W/m^2"
-color_map = "red"
+color_map = "Reds"
 color = "red"
 location = "right"
 [[RCSolar.items]]
@@ -326,15 +338,22 @@ ShowGraph = true
 XaxisTitle = "Date/Time"
 [[RCWater.Yaxes]]
 title = "Gallons Per Minute"
+color = "black"
 [[RCWater.Yaxes]]
 title = "Watts"
-color_map = "red"
+color_map = "Reds"
 color = "red"
 location = "right"
+[[RCWater.Yaxes]]
+title = "Psig"
+color_map = "Blues"
+color = "blue"
+location = "left"
 [[RCWater.items]]
 query = "SELECT Time AS 'Time', GPM AS 'Gallons/Min' FROM `{my_schema}`.`MeterData` WHERE Time > '{BeginDate}' ORDER BY Time"
 variableNames = [ "Gallons/Min",]
 datafile = "GPM.csv"
+color = "black"
 axisNum = 0
 dataname = "RC Water Usage"
 [[RCWater.items]]
@@ -349,6 +368,12 @@ variableNames = [ "Well Power",]
 datafile = "WellPower.csv"
 axisNum = 1
 dataname = "RC Water Power"
+[[RCWater.items]]
+query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Pressure'), 1) AS 'System Pressure' FROM `{my_schema}`.`mqttmessages` WHERE topic='dc4f220da30c/data' AND  RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+variableNames = [ "Press",]
+datafile = "PressBoosterPress.csv"
+axisNum = 2
+dataname = "PRESSURE BOOSTER PRESSURE"
 
 [SSFurnace]
 GraphTitle = "Steamboat Furnace"
@@ -506,7 +531,7 @@ XaxisTitle = "Date/Time"
 title = "Watts"
 [[SSSolar.Yaxes]]
 title = "W/m^2"
-color_map = "red"
+color_map = "Reds"
 color = "red"
 location = "right"
 [[SSSolar.items]]
@@ -620,7 +645,7 @@ XaxisTitle = "Date/Time"
 title = "W/m^2"
 [[SSLights.Yaxes]]
 title = "UV"
-color_map = "red"
+color_map = "Reds"
 color = "red"
 location = "right"
 [[SSLights.items]]

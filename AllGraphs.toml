@@ -209,29 +209,20 @@ DBHost = "RC"
 ShowGraph = true
 XaxisTitle = "Date/Time"
 [[RCBooster.Yaxes]]
-title = "psig"
+title = "Seconds Run Time"
+color_map = "Greens"
+color = "green"
+location = "left"
 [[RCBooster.Yaxes]]
 title = "°F and % hum"
 color_map = "Blues"
 color = "blue"
 location = "right"
-[[RCBooster.Yaxes]]
-title = "Sec"
-color_map = "Greens"
-color = "green"
-location = "left"
-[[RCBooster.items]]
-query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Pressure'), 1) AS 'Press' FROM `{my_schema}`.`mqttmessages` WHERE topic='dc4f220da30c/data' AND  RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
-variableNames = [ "Press",]
-datafile = "PressBoosterPress.csv"
-axisNum = 0
-color = "black"
-dataname = "PRESSURE BOOSTER PRESSURE"
 [[RCBooster.items]]
 query = "SELECT Time AS 'Time', duration*value as PumpRun FROM `{my_schema}`.`pump_data` WHERE Time  > '{BeginDate}' AND Time  < now(6) ORDER BY id"
 variableNames = [ "PumpRun", ]
 datafile = "PressBoosterPump.csv"
-axisNum = 2
+axisNum = 0
 dataname = "PRESSURE BOOSTER PUMP"
 [[RCBooster.items]]
 query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Temperature'), 1) AS 'Temp' FROM `{my_schema}`.`mqttmessages` WHERE topic='dc4f220da30c/data' AND  RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"

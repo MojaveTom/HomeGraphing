@@ -354,6 +354,51 @@ datafile = "PressBoosterPress.csv"
 axisNum = 2
 dataname = "PRESSURE BOOSTER PRESSURE"
 
+[RCMotion]
+GraphTitle = "Ridgecrest Motion"
+outputFile = "RCMotion.htm"
+DBHost = "RC"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[RCMotion.Yaxes]]
+title = " "
+[[RCMotion.items]]
+query = "SELECT Time AS 'Time', value * 6 AS 'Kitchen' FROM `{my_schema}`.`kitchen_motion` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Kitchen",]
+datafile = "KitchenMotion.csv"
+axisNum = 0
+dataname = "RC Kitchen Motion"
+[[RCMotion.items]]
+query = "SELECT Time AS 'Time', value * 5 AS 'Dining' FROM `{my_schema}`.`dining_motion` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Dining",]
+datafile = "DiningMotion.csv"
+axisNum = 0
+dataname = "RC Dining Motion"
+[[RCMotion.items]]
+query = "SELECT Time AS 'Time', value * 4 AS 'Living' FROM `{my_schema}`.`living_motion` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Living",]
+datafile = "LivingMotion.csv"
+axisNum = 0
+dataname = "RC Living Motion"
+[[RCMotion.items]]
+query = "SELECT Time AS 'Time', value * 3 AS 'Computer' FROM `{my_schema}`.`computer_motion` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Computer",]
+datafile = "ComputerMotion.csv"
+axisNum = 0
+dataname = "RC Computer Motion"
+[[RCMotion.items]]
+query = "SELECT Time AS 'Time', value * 2 AS 'Guest' FROM `{my_schema}`.`guest_motion` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Guest",]
+datafile = "GuestMotion.csv"
+axisNum = 0
+dataname = "RC Guest Motion"
+[[RCMotion.items]]
+query = "SELECT Time AS 'Time', value * 1 AS 'Master' FROM `{my_schema}`.`dining_motion` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Dining",]
+datafile = "DiningMotion.csv"
+axisNum = 0
+dataname = "RC Dining Motion"
+
 [SSFurnace]
 GraphTitle = "Steamboat Furnace"
 outputFile = "SSFurnace.htm"

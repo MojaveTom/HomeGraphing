@@ -28,6 +28,8 @@
  *  to the table with the time of the second advanced by one microsecond (to keep the rows
  *  in the same order whether sorted by time or id).  The duration of both added rows is
  *  zero, but will be updated when the next pump data comes in.
+ *
+ *  See comments below for table creation.
  */
 
 DELIMITER $$
@@ -121,6 +123,186 @@ DELIMITER ;
 
 DELIMITER $$
 
+CREATE OR REPLACE PROCEDURE add_pt_to_kitchen_motion ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
+    BEGIN
+        SET @newT = newTime;
+        SET @newV = newval;
+
+        SELECT count(*) INTO @rowCount FROM `demay_farm`.`kitchen_motion`;
+        IF @rowCount > 1 THEN
+            SELECT MAX(Id) INTO @theId FROM `demay_farm`.`kitchen_motion`;
+            SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`kitchen_motion` WHERE Id = @theId LIMIT 1;
+            SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`kitchen_motion` WHERE Id = @theId - 1 LIMIT 1;
+            -- select "Update the time on the last row to the current time (minus 1 microsec)";
+            UPDATE `demay_farm`.`kitchen_motion` SET Time = TIMESTAMPADD(MICROSECOND, -1, @newT) WHERE Id = @theId;
+            SET @dur = UNIX_TIMESTAMP(@newT) - UNIX_TIMESTAMP(@prevTm1);
+            -- select "Update the duration on the last TWO rows to the current duration.";
+            UPDATE `demay_farm`.`kitchen_motion` SET duration = @dur WHERE Id >= @iDm1;
+            IF (@prevVal != @newV) THEN
+                INSERT INTO `demay_farm`.`kitchen_motion` VALUES (DEFAULT, @newT, @newV, 0);
+                INSERT INTO `demay_farm`.`kitchen_motion` VALUES (DEFAULT, TIMESTAMPADD(MICROSECOND, 1, @newT), @newV, 0);
+            END IF;
+        ELSE
+            -- select "Inserting first rows.";
+            INSERT INTO `demay_farm`.`kitchen_motion` VALUES (DEFAULT, @newT, @newV, 0);
+        END IF;
+    END;
+$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE OR REPLACE PROCEDURE add_pt_to_dining_motion ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
+    BEGIN
+        SET @newT = newTime;
+        SET @newV = newval;
+
+        SELECT count(*) INTO @rowCount FROM `demay_farm`.`dining_motion`;
+        IF @rowCount > 1 THEN
+            SELECT MAX(Id) INTO @theId FROM `demay_farm`.`dining_motion`;
+            SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`dining_motion` WHERE Id = @theId LIMIT 1;
+            SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`dining_motion` WHERE Id = @theId - 1 LIMIT 1;
+            -- select "Update the time on the last row to the current time (minus 1 microsec)";
+            UPDATE `demay_farm`.`dining_motion` SET Time = TIMESTAMPADD(MICROSECOND, -1, @newT) WHERE Id = @theId;
+            SET @dur = UNIX_TIMESTAMP(@newT) - UNIX_TIMESTAMP(@prevTm1);
+            -- select "Update the duration on the last TWO rows to the current duration.";
+            UPDATE `demay_farm`.`dining_motion` SET duration = @dur WHERE Id >= @iDm1;
+            IF (@prevVal != @newV) THEN
+                INSERT INTO `demay_farm`.`dining_motion` VALUES (DEFAULT, @newT, @newV, 0);
+                INSERT INTO `demay_farm`.`dining_motion` VALUES (DEFAULT, TIMESTAMPADD(MICROSECOND, 1, @newT), @newV, 0);
+            END IF;
+        ELSE
+            -- select "Inserting first rows.";
+            INSERT INTO `demay_farm`.`dining_motion` VALUES (DEFAULT, @newT, @newV, 0);
+        END IF;
+    END;
+$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE OR REPLACE PROCEDURE add_pt_to_living_motion ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
+    BEGIN
+        SET @newT = newTime;
+        SET @newV = newval;
+
+        SELECT count(*) INTO @rowCount FROM `demay_farm`.`living_motion`;
+        IF @rowCount > 1 THEN
+            SELECT MAX(Id) INTO @theId FROM `demay_farm`.`living_motion`;
+            SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`living_motion` WHERE Id = @theId LIMIT 1;
+            SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`living_motion` WHERE Id = @theId - 1 LIMIT 1;
+            -- select "Update the time on the last row to the current time (minus 1 microsec)";
+            UPDATE `demay_farm`.`living_motion` SET Time = TIMESTAMPADD(MICROSECOND, -1, @newT) WHERE Id = @theId;
+            SET @dur = UNIX_TIMESTAMP(@newT) - UNIX_TIMESTAMP(@prevTm1);
+            -- select "Update the duration on the last TWO rows to the current duration.";
+            UPDATE `demay_farm`.`living_motion` SET duration = @dur WHERE Id >= @iDm1;
+            IF (@prevVal != @newV) THEN
+                INSERT INTO `demay_farm`.`living_motion` VALUES (DEFAULT, @newT, @newV, 0);
+                INSERT INTO `demay_farm`.`living_motion` VALUES (DEFAULT, TIMESTAMPADD(MICROSECOND, 1, @newT), @newV, 0);
+            END IF;
+        ELSE
+            -- select "Inserting first rows.";
+            INSERT INTO `demay_farm`.`living_motion` VALUES (DEFAULT, @newT, @newV, 0);
+        END IF;
+    END;
+$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE OR REPLACE PROCEDURE add_pt_to_computer_motion ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
+    BEGIN
+        SET @newT = newTime;
+        SET @newV = newval;
+
+        SELECT count(*) INTO @rowCount FROM `demay_farm`.`computer_motion`;
+        IF @rowCount > 1 THEN
+            SELECT MAX(Id) INTO @theId FROM `demay_farm`.`computer_motion`;
+            SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`computer_motion` WHERE Id = @theId LIMIT 1;
+            SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`computer_motion` WHERE Id = @theId - 1 LIMIT 1;
+            -- select "Update the time on the last row to the current time (minus 1 microsec)";
+            UPDATE `demay_farm`.`computer_motion` SET Time = TIMESTAMPADD(MICROSECOND, -1, @newT) WHERE Id = @theId;
+            SET @dur = UNIX_TIMESTAMP(@newT) - UNIX_TIMESTAMP(@prevTm1);
+            -- select "Update the duration on the last TWO rows to the current duration.";
+            UPDATE `demay_farm`.`computer_motion` SET duration = @dur WHERE Id >= @iDm1;
+            IF (@prevVal != @newV) THEN
+                INSERT INTO `demay_farm`.`computer_motion` VALUES (DEFAULT, @newT, @newV, 0);
+                INSERT INTO `demay_farm`.`computer_motion` VALUES (DEFAULT, TIMESTAMPADD(MICROSECOND, 1, @newT), @newV, 0);
+            END IF;
+        ELSE
+            -- select "Inserting first rows.";
+            INSERT INTO `demay_farm`.`computer_motion` VALUES (DEFAULT, @newT, @newV, 0);
+        END IF;
+    END;
+$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE OR REPLACE PROCEDURE add_pt_to_guest_motion ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
+    BEGIN
+        SET @newT = newTime;
+        SET @newV = newval;
+
+        SELECT count(*) INTO @rowCount FROM `demay_farm`.`guest_motion`;
+        IF @rowCount > 1 THEN
+            SELECT MAX(Id) INTO @theId FROM `demay_farm`.`guest_motion`;
+            SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`guest_motion` WHERE Id = @theId LIMIT 1;
+            SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`guest_motion` WHERE Id = @theId - 1 LIMIT 1;
+            -- select "Update the time on the last row to the current time (minus 1 microsec)";
+            UPDATE `demay_farm`.`guest_motion` SET Time = TIMESTAMPADD(MICROSECOND, -1, @newT) WHERE Id = @theId;
+            SET @dur = UNIX_TIMESTAMP(@newT) - UNIX_TIMESTAMP(@prevTm1);
+            -- select "Update the duration on the last TWO rows to the current duration.";
+            UPDATE `demay_farm`.`guest_motion` SET duration = @dur WHERE Id >= @iDm1;
+            IF (@prevVal != @newV) THEN
+                INSERT INTO `demay_farm`.`guest_motion` VALUES (DEFAULT, @newT, @newV, 0);
+                INSERT INTO `demay_farm`.`guest_motion` VALUES (DEFAULT, TIMESTAMPADD(MICROSECOND, 1, @newT), @newV, 0);
+            END IF;
+        ELSE
+            -- select "Inserting first rows.";
+            INSERT INTO `demay_farm`.`guest_motion` VALUES (DEFAULT, @newT, @newV, 0);
+        END IF;
+    END;
+$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE OR REPLACE PROCEDURE add_pt_to_master_motion ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
+    BEGIN
+        SET @newT = newTime;
+        SET @newV = newval;
+
+        SELECT count(*) INTO @rowCount FROM `demay_farm`.`master_motion`;
+        IF @rowCount > 1 THEN
+            SELECT MAX(Id) INTO @theId FROM `demay_farm`.`master_motion`;
+            SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`master_motion` WHERE Id = @theId LIMIT 1;
+            SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`master_motion` WHERE Id = @theId - 1 LIMIT 1;
+            -- select "Update the time on the last row to the current time (minus 1 microsec)";
+            UPDATE `demay_farm`.`master_motion` SET Time = TIMESTAMPADD(MICROSECOND, -1, @newT) WHERE Id = @theId;
+            SET @dur = UNIX_TIMESTAMP(@newT) - UNIX_TIMESTAMP(@prevTm1);
+            -- select "Update the duration on the last TWO rows to the current duration.";
+            UPDATE `demay_farm`.`master_motion` SET duration = @dur WHERE Id >= @iDm1;
+            IF (@prevVal != @newV) THEN
+                INSERT INTO `demay_farm`.`master_motion` VALUES (DEFAULT, @newT, @newV, 0);
+                INSERT INTO `demay_farm`.`master_motion` VALUES (DEFAULT, TIMESTAMPADD(MICROSECOND, 1, @newT), @newV, 0);
+            END IF;
+        ELSE
+            -- select "Inserting first rows.";
+            INSERT INTO `demay_farm`.`master_motion` VALUES (DEFAULT, @newT, @newV, 0);
+        END IF;
+    END;
+$$
+
+DELIMITER ;
+
+DELIMITER $$
+
 CREATE OR REPLACE PROCEDURE add_pt_to_Play ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
     BEGIN
         SET @newT = newTime;
@@ -151,7 +333,7 @@ DELIMITER ;
 
 /*
 
-CREATE OR REPLACE TABLE `booltabletemplate` (
+CREATE OR REPLACE TABLE `demay_farm`.`BoolTableTemplate` (
   `Id` bigint(20) NOT NULL AUTO_INCREMENT,
   `Time` datetime(6) DEFAULT NULL,
   `value` tinyint(1) DEFAULT NULL,
@@ -159,10 +341,19 @@ CREATE OR REPLACE TABLE `booltabletemplate` (
   PRIMARY KEY (`Id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-CREATE TABLE `demay_farm`.`pump_data` like BoolTableTemplate;
-CREATE TABLE `demay_farm`.`pressure_pump` like BoolTableTemplate;
-CREATE TABLE `demay_farm`.`submersible_pump` like BoolTableTemplate;
-CREATE TABLE `demay_farm`.`play_data` like BoolTableTemplate;
+CREATE TABLE `demay_farm`.`pump_data` LIKE BoolTableTemplate;
+CREATE TABLE `demay_farm`.`pressure_pump` LIKE BoolTableTemplate;
+CREATE TABLE `demay_farm`.`submersible_pump` LIKE BoolTableTemplate;
+
+CREATE TABLE `demay_farm`.`kitchen_motion` LIKE BoolTableTemplate;
+CREATE TABLE `demay_farm`.`dining_motion` LIKE BoolTableTemplate;
+CREATE TABLE `demay_farm`.`living_motion` LIKE BoolTableTemplate;
+CREATE TABLE `demay_farm`.`computer_motion` LIKE BoolTableTemplate;
+CREATE TABLE `demay_farm`.`guest_motion` LIKE BoolTableTemplate;
+CREATE TABLE `demay_farm`.`master_motion` LIKE BoolTableTemplate;
+
+
+CREATE TABLE `demay_farm`.`play_data` LIKE BoolTableTemplate;
 
 CALL add_pt_to_Play('2021-06-04 10:30:00.123456', 0); SELECT * FROM play_data;
 CALL add_pt_to_Play('2021-06-04 10:31:00.123456', 0); SELECT * FROM play_data;

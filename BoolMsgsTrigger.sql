@@ -32,21 +32,62 @@ $$
 DELIMITER ;
 
 DELIMITER $$
-CREATE TABLE IF NOT EXISTS `demay_farm`.`motion` (
-  `Id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `Time` datetime(6) NOT NULL,
-  `Sensor` varchar(255) NOT NULL,
-  `value` BOOLEAN NOT NULL,
-  PRIMARY KEY (`Id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+/*[begin_label:]*/
+FOR rec IN ( SELECT RecTime AS t, message AS m FROM `demay_farm`.`mqttmessages` WHERE topic = 'a020a613638e/data' AND RecTime > timestampadd(day, -90, now()) )
+DO CALL add_pt_to_computer_motion(rec.t, json_value(rec.m, '$.MotionDetected') = 'ON');
+END FOR;
+ /*[ end_label ]*/
 $$
 DELIMITER ;
 
-ALTER TABLE motion AUTO_INCREMENT = 1;
+DELIMITER $$
+/*[begin_label:]*/
+FOR rec IN ( SELECT RecTime AS t, message AS m FROM `demay_farm`.`mqttmessages` WHERE topic = 'cc50e3550d5b/data' AND RecTime > timestampadd(day, -90, now()) )
+DO CALL add_pt_to_master_motion(rec.t, json_value(rec.m, '$.MotionDetected') = 'ON');
+END FOR;
+ /*[ end_label ]*/
+$$
+DELIMITER ;
 
-INSERT IGNORE INTO `demay_farm`.`motion` (Time, Sensor, value)
-  SELECT RecTime, "Computer Room", json_value(message, '$.MotionDetected') = 'ON' FROM `demay_far,`.`mqttmessages`
-  WHERE topic = 'a020a613638e/data' AND SUBSTR(json_value(message, '$.PublishReason'),1,1) = 'M' ;
+DELIMITER $$
+/*[begin_label:]*/
+FOR rec IN ( SELECT TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), created) AS t, state FROM `new_ha`.`states` WHERE entity_id='binary_sensor.kitchen_motion' AND created > timestampadd(day, -90, now()) )
+DO   CALL `demay_farm`.`add_pt_to_kitchen_motion`(rec.t, rec.state='on');
+END FOR;
+ /*[ end_label ]*/
+$$
+DELIMITER ;
+
+DELIMITER $$
+/*[begin_label:]*/
+FOR rec IN ( SELECT TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), created) AS t, state FROM `new_ha`.`states` WHERE entity_id='binary_sensor.dining_motion' AND created > timestampadd(day, -90, now()) )
+DO   CALL `demay_farm`.`add_pt_to_dining_motion`(rec.t, rec.state='on');
+END FOR;
+ /*[ end_label ]*/
+$$
+DELIMITER ;
+
+DELIMITER $$
+/*[begin_label:]*/
+FOR rec IN ( SELECT TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), created) AS t, state FROM `new_ha`.`states` WHERE entity_id='binary_sensor.living_motion' AND created > timestampadd(day, -90, now()) )
+DO   CALL `demay_farm`.`add_pt_to_living_motion`(rec.t, rec.state='on');
+END FOR;
+ /*[ end_label ]*/
+$$
+DELIMITER ;
+
+DELIMITER $$
+/*[begin_label:]*/
+FOR rec IN ( SELECT TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), created) AS t, state FROM `new_ha`.`states` WHERE entity_id='binary_sensor.guest_motion' AND created > timestampadd(day, -90, now()) )
+DO   CALL `demay_farm`.`add_pt_to_guest_motion`(rec.t, rec.state='on');
+END FOR;
+ /*[ end_label ]*/
+$$
+DELIMITER ;
+
+-- INSERT IGNORE INTO `demay_farm`.`computer_motion` (Time, Sensor, value)
+--   SELECT RecTime, "Computer Room", json_value(message, '$.MotionDetected') = 'ON' FROM `demay_far,`.`mqttmessages`
+--   WHERE topic = 'a020a613638e/data' AND SUBSTR(json_value(message, '$.PublishReason'),1,1) = 'M' ;
 
 DELIMITER $$
 CREATE OR REPLACE TRIGGER SaveInterestingMqtt AFTER INSERT ON `demay_farm`.`mqttmessages` 
@@ -72,15 +113,15 @@ BEGIN
     /* Computer Room MTH: message example
     {"MachineID":"a020a613638e","SampleTime":"2021-09-15 21:18:43-0700","MotionDetected":"OFF","Temperature":84.92,"Humidity":24.9,"PublishReason":"M--"}
     */
-    IF NEW.topic = 'a020a613638e/data' AND SUBSTR(json_value(NEW.message, '$.PublishReason'),1,1) = 'M' THEN
-        INSERT INTO `demay_farm`.`motion` VALUES (DEFAULT, NEW.rectime, 'Computer Room', json_value(NEW.message, '$.MotionDetected') = 'ON');
+    IF NEW.topic = 'a020a613638e/data' THEN
+        CALL  add_pt_to_computer_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
         LEAVE `whole_proc`;
     END IF;
     /* Master Bed MTH: message example
     {"MachineID":"cc50e3550d5b","UnixTime":1631768050,"SampleTime":"2021-09-15 21:54:10-0700","MotionDetected":"ON","Temperature":80.2,"Humidity":25.4,"PublishReason":"M--"}
     */
-    IF NEW.topic = 'cc50e3550d5b/data' AND SUBSTR(json_value(NEW.message, '$.PublishReason'),1,1) = 'M' THEN
-        INSERT INTO `demay_farm`.`motion` VALUES (DEFAULT, NEW.rectime, 'Master Bed', json_value(NEW.message, '$.MotionDetected') = 'ON');
+    IF NEW.topic = 'cc50e3550d5b/data' THEN
+        CALL  add_pt_to_master_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
         LEAVE `whole_proc`;
     END IF;
 END;

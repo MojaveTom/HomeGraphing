@@ -297,18 +297,6 @@ color_map = "Reds"
 color = "red"
 location = "right"
 [[RCSolar.items]]
-query = "SELECT Time AS 'Time', OutWattsNow AS 'North Array' FROM `{my_schema}`.`SolarEnergy` WHERE Name = 'North Array' AND Time > '{BeginDate}' ORDER BY Time"
-variableNames = [ "North Array",]
-datafile = "NorthArray.csv"
-axisNum = 0
-dataname = "NORTH SOLAR"
-[[RCSolar.items]]
-query = "SELECT Time AS 'Time', OutWattsNow AS 'South Array' FROM `{my_schema}`.`SolarEnergy` WHERE Name = 'South Array' AND Time > '{BeginDate}' ORDER BY Time"
-variableNames = [ "South Array",]
-datafile = "SouthArray.csv"
-axisNum = 0
-dataname = "SOUTH SOLAR"
-[[RCSolar.items]]
 query = "SELECT Time AS 'Time', W AS 'Watts' FROM `{my_schema}`.`solarinverter_102` WHERE Time > '{BeginDate}' ORDER BY Time"
 variableNames = [ "Watts",]
 datafile = "RCSolar.csv"

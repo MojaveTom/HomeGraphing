@@ -124,6 +124,13 @@ BEGIN
         CALL  add_pt_to_master_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
         LEAVE `whole_proc`;
     END IF;
+    /* Kitchen2 mthWeather: message example
+    {"MachineID":"e8db84e302d0","SampleTime":"2021-09-21 20:36:09-0700","MotionDetected":"ON","Temperature":84.38,"Humidity":13.9,"ConsolePower":"ON","PublishReason":"M---"}
+    */
+    IF NEW.topic = 'e8db84e302d0/data' THEN
+        CALL  add_pt_to_kitchen2_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
+        LEAVE `whole_proc`;
+    END IF;
 END;
 $$
 DELIMITER ;

@@ -724,93 +724,45 @@ XaxisTitle = "Date/Time"
 [[SSMotion.Yaxes]]
 title = "Motion"
 [[SSMotion.items]]
-query = "SELECT RecTime AS 'Time', (json_value(message, '$.MotionDetected') = 'ON')*16 AS 'Master Window' FROM `{my_schema}`.`mqttmessages` WHERE ((topic='a020a6135ed9/data' AND RecTime < '2019-11-16 17:00') OR (topic='3c71bf36eb61/data' AND RecTime > '2019-11-16 16:39')) AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+query = "SELECT Time AS 'Time', value*16 AS 'Master Window' FROM `{my_schema}`.`masterw_motion` WHERE Time  > '{BeginDate}' ORDER BY Time"
 variableNames = [ "Master Window",]
 datafile = "SSMasterWindowMotion.csv"
-lineType = "step"
 dataname = "SS MASTER WINDOW MOTION"
-[SSMotion.items.lineMods]
-"glyph.line_width" = "2"
-"muted_glyph.line_width" = "4"
-"glyph.mode" = "'after'"
-"muted_glyph.mode" = "'after'"
 [[SSMotion.items]]
-query = "SELECT time AS 'Time', (value != 0)*15 AS 'Master' FROM `{my_schema}`.`master_motion` WHERE time > '{BeginDate}' ORDER BY time"
+query = "SELECT time AS 'Time', value*15 AS 'Master' FROM `{my_schema}`.`master_motion` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Master",]
 datafile = "SSMasterMotion.csv"
-lineType = "step"
 dataname = "SS MASTER MOTION"
-[SSMotion.items.lineMods]
-"glyph.line_width" = "2"
-"muted_glyph.line_width" = "4"
-"glyph.mode" = "'after'"
-"muted_glyph.mode" = "'after'"
 [[SSMotion.items]]
-query = "SELECT RecTime AS 'Time', (json_value(message, '$.MotionDetected') = 'ON')*14 AS 'Guest' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c704c5/data' AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+query = "SELECT Time AS 'Time', value*14 AS 'Guest' FROM `{my_schema}`.`guest_motion` WHERE Time  > '{BeginDate}' ORDER BY Time"
 variableNames = [ "Guest",]
 datafile = "SSGuestMotion.csv"
-lineType = "step"
 dataname = "SS GUEST MOTION"
-[SSMotion.items.lineMods]
-"glyph.line_width" = "2"
-"muted_glyph.line_width" = "4"
-"glyph.mode" = "'after'"
-"muted_glyph.mode" = "'after'"
 [[SSMotion.items]]
-query = "SELECT time AS 'Time', (value != 0)*13 AS 'Computer' FROM `{my_schema}`.`computer_motion` WHERE time > '{BeginDate}' ORDER BY time"
+query = "SELECT time AS 'Time', value*13 AS 'Computer' FROM `{my_schema}`.`computer_motion` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Computer",]
 datafile = "SSComputerMotion.csv"
-lineType = "step"
 dataname = "SS COMPUTER MOTION"
-[SSMotion.items.lineMods]
-"glyph.line_width" = "2"
-"muted_glyph.line_width" = "4"
-"glyph.mode" = "'after'"
-"muted_glyph.mode" = "'after'"
 [[SSMotion.items]]
-query = "SELECT time AS 'Time', (value != 0)*12 AS 'Living' FROM `{my_schema}`.`living_motion` WHERE time > '{BeginDate}' ORDER BY time"
+query = "SELECT time AS 'Time', value*12 AS 'Living' FROM `{my_schema}`.`living_motion` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Living",]
 datafile = "SSLivingMotion.csv"
-lineType = "step"
 dataname = "SS LIVING MOTION"
-[SSMotion.items.lineMods]
-"glyph.line_width" = "2"
-"muted_glyph.line_width" = "4"
-"glyph.mode" = "'after'"
-"muted_glyph.mode" = "'after'"
 [[SSMotion.items]]
-query = "SELECT time AS 'Time', (value != 0)*11 AS 'Kitchen' FROM `{my_schema}`.`kitchen_motion` WHERE time > '{BeginDate}' ORDER BY time"
+query = "SELECT time AS 'Time', value*11 AS 'Kitchen' FROM `{my_schema}`.`kitchen_motion` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Kitchen",]
 datafile = "SSKitchenMotion.csv"
-lineType = "step"
 dataname = "SS KITCHEN MOTION"
-[SSMotion.items.lineMods]
-"glyph.line_width" = "2"
-"muted_glyph.line_width" = "4"
-"glyph.mode" = "'after'"
-"muted_glyph.mode" = "'after'"
 [[SSMotion.items]]
-query = "SELECT time AS 'Time', (value != 0)*10 AS 'Mud' FROM `{my_schema}`.`mud_motion` WHERE time > '{BeginDate}' ORDER BY time"
+query = "SELECT time AS 'Time', value*10 AS 'Mud' FROM `{my_schema}`.`mud_motion` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Mud",]
 datafile = "SSMudMotion.csv"
-lineType = "step"
 dataname = "SS MUD MOTION"
-[SSMotion.items.lineMods]
-"glyph.line_width" = "2"
-"muted_glyph.line_width" = "4"
-"glyph.mode" = "'after'"
-"muted_glyph.mode" = "'after'"
 [[SSMotion.items]]
-query = "SELECT RecTime AS 'Time', (json_value(message, '$.MotionDetected') = 'ON')*9 AS 'Garage' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c70fc9/data' AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+query = "SELECT Time AS 'Time', value*9 AS 'Garage' FROM `{my_schema}`.`garage_motion` WHERE Time  > '{BeginDate}' ORDER BY Time"
 variableNames = [ "Garage",]
 datafile = "SSGarageMotion.csv"
-lineType = "step"
 dataname = "SS GARAGE MOTION"
-[SSMotion.items.lineMods]
-"glyph.line_width" = "2"
-"muted_glyph.line_width" = "4"
-"glyph.mode" = "'after'"
-"muted_glyph.mode" = "'after'"
 
 [SSHums]
 GraphTitle = "Steamboat Humidities"

@@ -51,6 +51,19 @@ DELIMITER ;
 
 DELIMITER $$
 /*[begin_label:]*/
+-- FOR rec IN ( SELECT RecTime AS t, message AS m FROM `demay_farm`.`mqttmessages` WHERE topic = 'cc50e3550d5b/data' AND RecTime > timestampadd(day, -90, now()) )
+-- DO INSERT IGNORE INTO `demay_farm`.`master_temp` SET time = rec.t, value = json_value(rec.m, '$.Temperature');
+-- END FOR;
+ /*[ end_label ]*/
+INSERT IGNORE INTO  `demay_farm`.`master_temp` (SELECT RecTime AS t, json_value(message, '$.Temperature') AS t FROM `demay_farm`.`mqttmessages` WHERE topic = 'cc50e3550d5b/data' AND RecTime > '2021-07-31 10:46:13');
+INSERT IGNORE INTO  `demay_farm`.`master_hum` (SELECT RecTime AS t, json_value(message, '$.Humidity') AS t FROM `demay_farm`.`mqttmessages` WHERE topic = 'cc50e3550d5b/data' AND RecTime > '2021-07-31 10:46:13');
+INSERT IGNORE INTO  `demay_farm`.`computer_temp` (SELECT RecTime AS t, json_value(message, '$.Temperature') AS t FROM `demay_farm`.`mqttmessages` WHERE topic = 'a020a613638e/data' AND RecTime > '2021-07-31 10:46:13');
+INSERT IGNORE INTO  `demay_farm`.`computer_hum` (SELECT RecTime AS t, json_value(message, '$.Humidity') AS t FROM `demay_farm`.`mqttmessages` WHERE topic = 'a020a613638e/data' AND RecTime > '2021-07-31 10:46:13');
+$$
+DELIMITER ;
+
+DELIMITER $$
+/*[begin_label:]*/
 FOR rec IN ( SELECT TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), created) AS t, state FROM `new_ha`.`states` WHERE entity_id='binary_sensor.kitchen_motion' AND created > timestampadd(day, -90, now()) )
 DO   CALL `demay_farm`.`add_pt_to_kitchen_motion`(rec.t, rec.state='on');
 END FOR;
@@ -115,6 +128,8 @@ BEGIN
     */
     IF NEW.topic = 'a020a613638e/data' THEN
         CALL  add_pt_to_computer_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
+        INSERT IGNORE INTO `demay_farm`.`computer_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.Temperature');
+        INSERT IGNORE INTO `demay_farm`.`computer_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.Humidity');
         LEAVE `whole_proc`;
     END IF;
     /* Master Bed MTH: message example
@@ -122,6 +137,8 @@ BEGIN
     */
     IF NEW.topic = 'cc50e3550d5b/data' THEN
         CALL  add_pt_to_master_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
+        INSERT IGNORE INTO `demay_farm`.`master_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.Temperature');
+        INSERT IGNORE INTO `demay_farm`.`master_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.Humidity');
         LEAVE `whole_proc`;
     END IF;
     /* Kitchen2 mthWeather: message example

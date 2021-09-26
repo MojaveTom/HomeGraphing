@@ -12,6 +12,12 @@ variableNames = [ "Outside", "Computer",]
 datafile = "RcWxTemps.csv"
 dataname = "Outside/Inside Temps"
 [[RCTemps.items]]
+query = "SELECT time AS 'Time', value AS 'ComputerMTH' FROM `{my_schema}`.`computer_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "ComputerMTH",]
+datafile = "ComputerMTHTemp.csv"
+axisNum = 0
+dataname = "COMPUTER MTH TEMP"
+[[RCTemps.items]]
 query = "SELECT time AS 'Time', value AS 'Thermostat' FROM `{my_schema}`.`thermostat_temp` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Thermostat",]
 datafile = "ThermostatTemps.csv"
@@ -59,6 +65,12 @@ variableNames = [ "Computer",]
 datafile = "ComputerTemp.csv"
 axisNum = 0
 dataname = "COMPUTER TEMP"
+[[RCHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'ComputerMTH' FROM `{my_schema}`.`computer_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "ComputerMTH",]
+datafile = "ComputerMTHTemp.csv"
+axisNum = 0
+dataname = "COMPUTER MTH TEMP"
 [[RCHeaters.items]]
 query = "SELECT time AS 'Time', value AS 'Dining' FROM `{my_schema}`.`dining_temp` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Dining",]
@@ -145,6 +157,12 @@ query = "SELECT date AS 'Time', humidity AS 'Outside', humidityin AS 'Computer' 
 variableNames = [ "Outside", "Computer",]
 datafile = "RcWxHums.csv"
 dataname = "OUTSIDE / INSIDE HUMIDITY"
+[[RCHums.items]]
+query = "SELECT time AS 'Time', value AS 'ComputerMTH' FROM `{my_schema}`.`computer_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "ComputerMTH",]
+datafile = "ComputerMTHums.csv"
+axisNum = 0
+dataname = "COMPUTER MTH HUMIDITY"
 [[RCHums.items]]
 query = "SELECT time AS 'Time', value AS 'Thermostat' FROM `{my_schema}`.`thermostat_hum` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Thermostat",]

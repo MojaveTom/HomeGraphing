@@ -7,8 +7,8 @@ XaxisTitle = "Date/Time"
 [[RCTemps.Yaxes]]
 title = "°F"
 [[RCTemps.items]]
-query = "SELECT date AS 'Time', tempf AS 'Outside', tempinf AS 'Computer' FROM `{my_schema}`.`rcweather` WHERE date > '{BeginDate}' ORDER BY date"
-variableNames = [ "Outside", "Computer",]
+query = "SELECT date AS 'Time', tempf AS 'Outside', tempinf AS 'Computer', temp2f AS 'BigTree' FROM `{my_schema}`.`rcweather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Outside", "Computer", "BigTree"]
 datafile = "RcWxTemps.csv"
 dataname = "Outside/Inside Temps"
 [[RCTemps.items]]

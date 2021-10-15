@@ -153,8 +153,8 @@ XaxisTitle = "Date/Time"
 [[RCHums.Yaxes]]
 title = "%"
 [[RCHums.items]]
-query = "SELECT date AS 'Time', humidity AS 'Outside', humidityin AS 'Computer' FROM `{my_schema}`.`rcweather` WHERE date > '{BeginDate}' ORDER BY date"
-variableNames = [ "Outside", "Computer",]
+query = "SELECT date AS 'Time', humidity AS 'Outside', humidityin AS 'Computer', humidity2 AS 'BigTree' FROM `{my_schema}`.`rcweather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Outside", "Computer", "BigTree",]
 datafile = "RcWxHums.csv"
 dataname = "OUTSIDE / INSIDE HUMIDITY"
 [[RCHums.items]]

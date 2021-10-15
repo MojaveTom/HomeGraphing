@@ -387,6 +387,12 @@ datafile = "KitchenMotion.csv"
 axisNum = 0
 dataname = "RC Kitchen Motion"
 [[RCMotion.items]]
+query = "SELECT Time AS 'Time', value * 6 AS 'KitchenMTH' FROM `{my_schema}`.`kitchenMTH_motion` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "KitchenMTH",]
+datafile = "KitchenMTHMotion.csv"
+axisNum = 0
+dataname = "RC KitchenMTH Motion"
+[[RCMotion.items]]
 query = "SELECT Time AS 'Time', value * 5 AS 'Dining' FROM `{my_schema}`.`dining_motion` WHERE Time > '{BeginDate}' ORDER BY Time"
 variableNames = [ "Dining",]
 datafile = "DiningMotion.csv"
@@ -411,11 +417,11 @@ datafile = "GuestMotion.csv"
 axisNum = 0
 dataname = "RC Guest Motion"
 [[RCMotion.items]]
-query = "SELECT Time AS 'Time', value * 1 AS 'Master' FROM `{my_schema}`.`dining_motion` WHERE Time > '{BeginDate}' ORDER BY Time"
-variableNames = [ "Dining",]
-datafile = "DiningMotion.csv"
+query = "SELECT Time AS 'Time', value * 1 AS 'Master' FROM `{my_schema}`.`master_motion` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Master",]
+datafile = "MasterMotion.csv"
 axisNum = 0
-dataname = "RC Dining Motion"
+dataname = "RC Master Motion"
 
 [SSFurnace]
 GraphTitle = "Steamboat Furnace"

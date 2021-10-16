@@ -432,11 +432,28 @@ XaxisTitle = "Date/Time"
 [[SSFurnace.Yaxes]]
 title = " "
 [[SSFurnace.items]]
-query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Temperature'), 1) AS 'Temp', round(json_value(message, '$.Humidity'), 1) AS 'Humidity', (json_value(message, '$.Burner') = 'ON')*20+20 AS 'Furnace', (json_value(message, '$.MotionDetected') = 'ON')*10+15 AS 'Motion' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c70fc9/data' AND  RecTime  > '{BeginDate}' AND RecTime  < now(6) AND json_value(message, '$.Temperature') < 150 AND json_value(message, '$.Humidity') < 110 ORDER BY RecTime"
-variableNames = [ "Temp", "Humidity", "Furnace", "Motion",]
-datafile = "SSFurnace.csv"
+query = "SELECT time AS 'Time', value AS 'Temp' FROM `{my_schema}`.`garage_temp` WHERE time  > '{BeginDate}' AND value < 150 ORDER BY time"
+variableNames = [ "Temp",]
+datafile = "SSGarageTemp.csv"
 axisNum = 0
-dataname = "SS Furnace"
+dataname = "SS Garage Temperature"
+[[SSFurnace.items]]
+query = "SELECT time AS 'Time', value AS 'Humidity' FROM `{my_schema}`.`garage_hum` WHERE time  > '{BeginDate}' AND value < 110 ORDER BY time"
+variableNames = [ "Humidity",]
+datafile = "SSGarageHumidity.csv"
+axisNum = 0
+dataname = "SS Garage Humidity"
+[[SSFurnace.items]]
+query = "SELECT time AS 'Time', value AS 'Furnace' FROM `{my_schema}`.`furnace_burner` WHERE time  > '{BeginDate}' ORDER BY time"
+variableNames = [ "Furnace",]
+datafile = "SSFurnaceBurner.csv"
+axisNum = 0
+dataname = "SS Furnace Burner"
+[[SSFurnace.items]]
+query = "SELECT Time AS 'Time', value*9 AS 'Garage Motion' FROM `{my_schema}`.`garage_motion` WHERE Time  > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Garage Motion",]
+datafile = "SSGarageMotion.csv"
+dataname = "SS GARAGE MOTION"
 
 [SSMasterWindow]
 GraphTitle = "Steamboat Master Window"
@@ -477,18 +494,18 @@ axisNum = 0
 dataname = "SS OUTSIDE LIGHT"
 [[SSMasterWindow.items]]
 query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Temperature'), 1) AS 'Window Temp' FROM `{my_schema}`.`mqttmessages` WHERE ((topic='a020a6135ed9/data' AND RecTime < '2019-11-16 17:00') OR (topic='3c71bf36eb61/data' AND RecTime > '2019-11-16 16:39'))  AND json_value(message, '$.Temperature') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
-variableNames = [ "MasterWindowTemp",]
+variableNames = [ "Window Temp",]
 datafile = "SSMasterWindowTemp.csv"
 axisNum = 2
 dataname = "SS Master Window Temperature"
 [[SSMasterWindow.items]]
-query = "SELECT time AS 'Time', value AS 'Room Temp' FROM `{my_schema}`.`master_temp` WHERE time > '{BeginDate}' ORDER BY time"
+query = "SELECT time AS 'Time', value AS 'MasterTemp' FROM `{my_schema}`.`master_temp` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "MasterTemp",]
 datafile = "SSMasterTemps.csv"
 axisNum = 2
 dataname = "MASTER TEMP"
 [[SSMasterWindow.items]]
-query = "SELECT date AS 'Time', tempf AS 'Outside Temp' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+query = "SELECT date AS 'Time', tempf AS 'Outside' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
 variableNames = [ "Outside",]
 datafile = "SSOutTemps.csv.csv"
 axisNum = 2
@@ -673,12 +690,13 @@ variableNames = [ "Mud",]
 datafile = "SSMudTemps.csv"
 dataname = "MUD TEMP"
 [[SSTemps.items]]
-query = "SELECT RecTime AS 'Time', round(json_value(message, '$.Temperature'), 1) AS 'Garage' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c70fc9/data' AND json_value(message, '$.Temperature') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
-variableNames = [ "Garage",]
+query = "SELECT time AS 'Time', value AS 'Temp' FROM `{my_schema}`.`garage_temp` WHERE time  > '{BeginDate}' AND value < 150 ORDER BY time"
+variableNames = [ "Temp",]
 datafile = "SSGarageTemp.csv"
-dataname = "SS GARAGE TEMPERATURE"
+axisNum = 0
+dataname = "SS Garage Temperature"
 [[SSTemps.items]]
-query = "SELECT RecTime AS 'Time', (json_value(message, '$.Fan') = 'ON')*20+20 AS 'Fan' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c70fc9/data' AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+query = "SELECT Time AS 'Time', duration AS 'Fan' FROM `{my_schema}`.`furnace_fan` WHERE  RecTime  > '{BeginDate}' ORDER BY Time"
 variableNames = [ "Fan",]
 datafile = "SSFurnaceFan.csv"
 dataname = "SS FURNACE FAN"
@@ -838,13 +856,13 @@ variableNames = [ "Mud",]
 datafile = "SSMudHums.csv"
 dataname = "MUD HUMIDITY"
 [[SSHums.items]]
-query = "SELECT RecTime AS 'Time', ROUND(json_value(message, '$.Humidity'),1) AS 'Garage' FROM `{my_schema}`.`mqttmessages` WHERE topic='cc50e3c70fc9/data' AND json_value(message, '$.Humidity') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
-variableNames = [ "Garage",]
+query = "SELECT time AS 'Time', value AS 'Humidity' FROM `{my_schema}`.`garage_hum` WHERE time  > '{BeginDate}' AND value < 110 ORDER BY time"
+variableNames = [ "Humidity",]
 datafile = "SSGarageHumidity.csv"
-lineType = "step"
-dataname = "SS GARAGE HUMIDITY"
-[SSHums.items.lineMods]
-"glyph.line_width" = "2"
-"muted_glyph.line_width" = "4"
-"glyph.mode" = "'after'"
-"muted_glyph.mode" = "'after'"
+axisNum = 0
+dataname = "SS Garage Humidity"
+# [SSHums.items.lineMods]
+# "glyph.line_width" = "2"
+# "muted_glyph.line_width" = "4"
+# "glyph.mode" = "'after'"
+# "muted_glyph.mode" = "'after'"

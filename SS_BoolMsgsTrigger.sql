@@ -127,6 +127,8 @@ BEGIN
         CALL  add_pt_to_garage_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
         CALL  add_pt_to_furnace_fan(NEW.rectime, json_value(NEW.message, '$.Fan') = 'ON');
         CALL  add_pt_to_furnace_burner(NEW.rectime, json_value(NEW.message, '$.Burner') = 'ON');
+        INSERT IGNORE INTO `steamboat`.`garage_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.Temperature');
+        INSERT IGNORE INTO `steamboat`.`garage_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.Humidity');
         LEAVE `whole_proc`;
     END IF;
     /* Master window: message example
@@ -189,11 +191,14 @@ CREATE TABLE IF NOT EXISTS  `steamboat`.`computer_uv` LIKE  `steamboat`.`test`;
 CREATE TABLE IF NOT EXISTS  `steamboat`.`computerW_motion` LIKE  `steamboat`.`BoolTableTemplate`;
 CREATE TABLE IF NOT EXISTS  `steamboat`.`masterW_motion` LIKE  `steamboat`.`BoolTableTemplate`;
 CREATE TABLE IF NOT EXISTS  `steamboat`.`guest_motion` LIKE  `steamboat`.`BoolTableTemplate`;
+CREATE TABLE IF NOT EXISTS  `steamboat`.`garage_temp` LIKE  `steamboat`.`test`;
+CREATE TABLE IF NOT EXISTS  `steamboat`.`garage_hum` LIKE  `steamboat`.`test`;
 CREATE TABLE IF NOT EXISTS  `steamboat`.`garage_motion` LIKE  `steamboat`.`BoolTableTemplate`;
 CREATE TABLE IF NOT EXISTS  `steamboat`.`furnace_fan` LIKE  `steamboat`.`BoolTableTemplate`;
 CREATE TABLE IF NOT EXISTS  `steamboat`.`furnace_burner` LIKE  `steamboat`.`BoolTableTemplate`;
 
-
+INSERT IGNORE INTO garage_temp SELECT RecTime AS time, json_value(message, '$.Temperature') AS value FROM `steamboat`.`mqttmessages` WHERE topic = 'cc50e3c70fc9/data' AND RecTime > timestampadd(day, -30, now());
+INSERT IGNORE INTO garage_hum SELECT RecTime AS time, json_value(message, '$.Humidity') AS value FROM `steamboat`.`mqttmessages` WHERE topic = 'cc50e3c70fc9/data' AND RecTime > timestampadd(day, -30, now());
 /*
   Steamboat weather as retrieved from Ambient Weather (.net) for my weather station.
 */

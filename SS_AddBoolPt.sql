@@ -1,7 +1,7 @@
 /*
  *  Call this procedure each time a new row of boolean data is added to the
  *  mqttmessages table.  It updates the motion table with extracted information.
- *  
+ *
  *  The idea is to have two rows in the table for each change in the state of motion,
  *  the first having the time of the change, and the second having the time of the next
  *  change, and both having the duration of the state.  To make plotting the durations
@@ -333,6 +333,66 @@ DELIMITER ;
 
 DELIMITER $$
 
+CREATE OR REPLACE PROCEDURE add_pt_to_furnace_fan ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
+    BEGIN
+        SET @newT = newTime;
+        SET @newV = newval;
+
+        SELECT count(*) INTO @rowCount FROM `steamboat`.`furnace_fan`;
+        IF @rowCount > 1 THEN
+            SELECT MAX(Id) INTO @theId FROM `steamboat`.`furnace_fan`;
+            SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `steamboat`.`furnace_fan` WHERE Id = @theId LIMIT 1;
+            SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `steamboat`.`furnace_fan` WHERE Id = @theId - 1 LIMIT 1;
+            -- select "Update the time on the last row to the current time (minus 1 microsec)";
+            UPDATE `steamboat`.`furnace_fan` SET Time = TIMESTAMPADD(MICROSECOND, -1, @newT) WHERE Id = @theId;
+            SET @dur = UNIX_TIMESTAMP(@newT) - UNIX_TIMESTAMP(@prevTm1);
+            -- select "Update the duration on the last TWO rows to the current duration.";
+            UPDATE `steamboat`.`furnace_fan` SET duration = @dur WHERE Id >= @iDm1;
+            IF (@prevVal != @newV) THEN
+                INSERT INTO `steamboat`.`furnace_fan` VALUES (DEFAULT, @newT, @newV, 0);
+                INSERT INTO `steamboat`.`furnace_fan` VALUES (DEFAULT, TIMESTAMPADD(MICROSECOND, 1, @newT), @newV, 0);
+            END IF;
+        ELSE
+            -- select "Inserting first rows.";
+            INSERT INTO `steamboat`.`furnace_fan` VALUES (DEFAULT, @newT, @newV, 0);
+        END IF;
+    END;
+$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+CREATE OR REPLACE PROCEDURE add_pt_to_furnace_burner ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
+    BEGIN
+        SET @newT = newTime;
+        SET @newV = newval;
+
+        SELECT count(*) INTO @rowCount FROM `steamboat`.`furnace_burner`;
+        IF @rowCount > 1 THEN
+            SELECT MAX(Id) INTO @theId FROM `steamboat`.`furnace_burner`;
+            SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `steamboat`.`furnace_burner` WHERE Id = @theId LIMIT 1;
+            SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `steamboat`.`furnace_burner` WHERE Id = @theId - 1 LIMIT 1;
+            -- select "Update the time on the last row to the current time (minus 1 microsec)";
+            UPDATE `steamboat`.`furnace_burner` SET Time = TIMESTAMPADD(MICROSECOND, -1, @newT) WHERE Id = @theId;
+            SET @dur = UNIX_TIMESTAMP(@newT) - UNIX_TIMESTAMP(@prevTm1);
+            -- select "Update the duration on the last TWO rows to the current duration.";
+            UPDATE `steamboat`.`furnace_burner` SET duration = @dur WHERE Id >= @iDm1;
+            IF (@prevVal != @newV) THEN
+                INSERT INTO `steamboat`.`furnace_burner` VALUES (DEFAULT, @newT, @newV, 0);
+                INSERT INTO `steamboat`.`furnace_burner` VALUES (DEFAULT, TIMESTAMPADD(MICROSECOND, 1, @newT), @newV, 0);
+            END IF;
+        ELSE
+            -- select "Inserting first rows.";
+            INSERT INTO `steamboat`.`furnace_burner` VALUES (DEFAULT, @newT, @newV, 0);
+        END IF;
+    END;
+$$
+
+DELIMITER ;
+
+DELIMITER $$
+
 CREATE OR REPLACE PROCEDURE add_pt_to_Play ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
     BEGIN
         SET @newT = newTime;
@@ -417,8 +477,8 @@ CREATE OR REPLACE PROCEDURE add_pt_to_Play2 ( newTime DATETIME(6), newval BOOLEA
         SET @iDm1 = 0;
 
         SELECT IFNULL(Id, 0), Time, Value, device INTO @iD, @prevT, @prevVal, @prevDev FROM `steamboat`.`play_data` WHERE device = @newDev ORDER BY Id DESC LIMIT 1;
-        SELECT IFNULL(Id, 0), Time, Value, device  INTO @iDm1, @prevTm1, @prevValm1, @prevDevm1 
-            FROM `steamboat`.`play_data` 
+        SELECT IFNULL(Id, 0), Time, Value, device  INTO @iDm1, @prevTm1, @prevValm1, @prevDevm1
+            FROM `steamboat`.`play_data`
             WHERE Id < @Id AND device = @newDev
             ORDER BY Id DESC LIMIT 1;
         select @iD, @prevT, @prevVal, @prevDev, @newDev;
@@ -437,8 +497,8 @@ CREATE OR REPLACE PROCEDURE add_pt_to_Play2 ( newTime DATETIME(6), newval BOOLEA
         ELSE
             -- SELECT MAX(Id) INTO @theId FROM `steamboat`.`play_data` WHERE device = @newDev;
             -- SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `steamboat`.`play_data` WHERE Id = @theId LIMIT 1;
-            -- SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 
-            --   FROM `steamboat`.`play_data` 
+            -- SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1
+            --   FROM `steamboat`.`play_data`
             --   WHERE Id < @theId AND device = @newDev
             --   ORDER BY Id DESC LIMIT 1;
             -- select "Update the time on the last row to the current time (minus 1 microsec)";
@@ -506,4 +566,3 @@ SET @newDev = 'playDe2'; CALL add_pt_to_Play2('2021-06-04 11:55:00.123456', 1, '
 
 DROP TABLE IF EXISTS Play_data;
 */
-

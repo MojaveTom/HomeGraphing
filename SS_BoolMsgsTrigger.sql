@@ -59,6 +59,17 @@ END FOR;
 $$
 DELIMITER ;
 
+DELIMITER $$
+/*[begin_label:]*/
+FOR rec IN ( SELECT RecTime AS t, message AS m FROM `steamboat`.`mqttmessages` WHERE topic = 'cc50e3c70fc9/data' AND RecTime > timestampadd(day, -30, now()) )
+DO
+  CALL add_pt_to_furnace_fan(rec.t, json_value(rec.m, '$.Fan') = 'ON');
+  CALL add_pt_to_furnace_burner(rec.t, json_value(rec.m, '$.Burner') = 'ON');
+END FOR;
+ /*[ end_label ]*/
+$$
+DELIMITER ;
+
 /**********************  Load new motion tables from old.   *********************************/
 RENAME TABLE mud_motion TO mud_motion_old;
 CREATE TABLE mud_motion like BoolTableTemplate;
@@ -98,7 +109,7 @@ DELIMITER ;
 
 /**************  Create when `steamboat` is the active database.  ***************************/
 DELIMITER $$
-CREATE OR REPLACE TRIGGER SaveInterestingMqtt AFTER INSERT ON `steamboat`.`mqttmessages` 
+CREATE OR REPLACE TRIGGER SaveInterestingMqtt AFTER INSERT ON `steamboat`.`mqttmessages`
 FOR EACH ROW
 `whole_proc`:
 BEGIN
@@ -114,6 +125,8 @@ BEGIN
     */
     IF NEW.topic = 'cc50e3c70fc9/data' THEN
         CALL  add_pt_to_garage_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
+        CALL  add_pt_to_furnace_fan(NEW.rectime, json_value(NEW.message, '$.Fan') = 'ON');
+        CALL  add_pt_to_furnace_burner(NEW.rectime, json_value(NEW.message, '$.Burner') = 'ON');
         LEAVE `whole_proc`;
     END IF;
     /* Master window: message example
@@ -177,6 +190,8 @@ CREATE TABLE IF NOT EXISTS  `steamboat`.`computerW_motion` LIKE  `steamboat`.`Bo
 CREATE TABLE IF NOT EXISTS  `steamboat`.`masterW_motion` LIKE  `steamboat`.`BoolTableTemplate`;
 CREATE TABLE IF NOT EXISTS  `steamboat`.`guest_motion` LIKE  `steamboat`.`BoolTableTemplate`;
 CREATE TABLE IF NOT EXISTS  `steamboat`.`garage_motion` LIKE  `steamboat`.`BoolTableTemplate`;
+CREATE TABLE IF NOT EXISTS  `steamboat`.`furnace_fan` LIKE  `steamboat`.`BoolTableTemplate`;
+CREATE TABLE IF NOT EXISTS  `steamboat`.`furnace_burner` LIKE  `steamboat`.`BoolTableTemplate`;
 
 
 /*
@@ -221,7 +236,7 @@ AFTER INSERT ON `homeassistant`.`states`
 FOR EACH ROW
 `whole_proc`:
 BEGIN
-    
+
     /*      MASTER BEDROOM SENSORS   */
  IF NEW.entity_id='sensor.masterbed_enviro_air_temperature' AND NEW.state < 140 AND NEW.state > -40 THEN
   INSERT IGNORE INTO `steamboat`.`master_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);

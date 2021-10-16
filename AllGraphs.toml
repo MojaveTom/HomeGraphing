@@ -444,8 +444,8 @@ datafile = "SSGarageHumidity.csv"
 axisNum = 0
 dataname = "SS Garage Humidity"
 [[SSFurnace.items]]
-query = "SELECT time AS 'Time', duration * value AS 'Furnace' FROM `{my_schema}`.`furnace_burner` WHERE time  > '{BeginDate}' ORDER BY time"
-variableNames = [ "Furnace",]
+query = "SELECT time AS 'Time', (duration * value) / 60 AS 'Furnace (min)' FROM `{my_schema}`.`furnace_burner` WHERE time  > '{BeginDate}' ORDER BY time"
+variableNames = [ "Furnace (min)",]
 datafile = "SSFurnaceBurner.csv"
 axisNum = 0
 dataname = "SS Furnace Burner"
@@ -696,8 +696,8 @@ datafile = "SSGarageTemp.csv"
 axisNum = 0
 dataname = "SS Garage Temperature"
 [[SSTemps.items]]
-query = "SELECT time AS 'Time', duration * value AS 'Fan' FROM `{my_schema}`.`furnace_fan` WHERE  time  > '{BeginDate}' ORDER BY Time"
-variableNames = [ "Fan",]
+query = "SELECT time AS 'Time', (duration * value) / 60 AS 'Fan (min)' FROM `{my_schema}`.`furnace_fan` WHERE  time  > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Fan (min)",]
 datafile = "SSFurnaceFan.csv"
 dataname = "SS FURNACE FAN"
 

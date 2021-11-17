@@ -32,6 +32,24 @@ $$
 DELIMITER ;
 
 DELIMITER $$
+CREATE TABLE IF NOT EXISTS `demay_farm`.`gate_angle` (
+  `Time` datetime(6) NOT NULL,
+  `value` FLOAT DEFAULT NULL,
+  PRIMARY KEY (`Time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+$$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TABLE IF NOT EXISTS `demay_farm`.`gate_battery` (
+  `Time` datetime(6) NOT NULL,
+  `value` FLOAT DEFAULT NULL,
+  PRIMARY KEY (`Time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+$$
+DELIMITER ;
+
+DELIMITER $$
 /*[begin_label:]*/
 FOR rec IN ( SELECT RecTime AS t, message AS m FROM `demay_farm`.`mqttmessages` WHERE topic = 'a020a613638e/data' AND RecTime > timestampadd(day, -90, now()) )
 DO CALL add_pt_to_computer_motion(rec.t, json_value(rec.m, '$.MotionDetected') = 'ON');
@@ -63,6 +81,8 @@ INSERT IGNORE INTO  `demay_farm`.`kitchenMTH_temp` (SELECT RecTime AS t, json_va
 INSERT IGNORE INTO  `demay_farm`.`kitchenMTH_hum` (SELECT RecTime AS t, json_value(message, '$.Humidity') AS t FROM `demay_farm`.`mqttmessages` WHERE topic = 'e8db84e302d0/data' AND RecTime > '2021-07-31 10:46:13');
 $$
 DELIMITER ;
+INSERT IGNORE INTO  `demay_farm`.`gate_angle` (SELECT RecTime AS t, json_value(message, '$.GateAngle') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'e8db84e569cf/data' AND RecTime > '2021-10-31');
+INSERT IGNORE INTO  `demay_farm`.`gate_battery` (SELECT RecTime AS t, json_value(message, '$.BatteryVolts') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'e8db84e569cf/data' AND RecTime > '2021-10-31');
 
 DELIMITER $$
 /*[begin_label:]*/
@@ -105,12 +125,12 @@ DELIMITER ;
 --   WHERE topic = 'a020a613638e/data' AND SUBSTR(json_value(message, '$.PublishReason'),1,1) = 'M' ;
 
 DELIMITER $$
-CREATE OR REPLACE TRIGGER SaveInterestingMqtt AFTER INSERT ON `demay_farm`.`mqttmessages` 
+CREATE OR REPLACE TRIGGER SaveInterestingMqtt AFTER INSERT ON `demay_farm`.`mqttmessages`
 FOR EACH ROW
 `whole_proc`:
 BEGIN
     /* Pressure Booster pump data.  */
-    IF NEW.topic = 'dc4f220da30c/data' OR NEW.topic = 'e8db84e569cf/data' THEN
+    IF NEW.topic = 'dc4f220da30c/data' THEN
         CALL add_pt_to_Pump(NEW.rectime, (json_value(NEW.message, '$.PumpRun') = 'ON') );
         LEAVE `whole_proc`;
     END IF;
@@ -150,6 +170,12 @@ BEGIN
         CALL  add_pt_to_kitchenMTH_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
         INSERT IGNORE INTO `demay_farm`.`kitchenMTH_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.Temperature');
         INSERT IGNORE INTO `demay_farm`.`kitchenMTH_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.Humidity');
+        LEAVE `whole_proc`;
+    END IF;
+    /* Gate data.  */
+    IF NEW.topic = 'e8db84e569cf/data' THEN
+        INSERT IGNORE INTO `demay_farm`.`gate_angle` SET time = NEW.RecTime, value = json_value(NEW.message, '$.GateAngle');
+        INSERT IGNORE INTO `demay_farm`.`gate_battery` SET time = NEW.RecTime, value = json_value(NEW.message, '$.BatteryVolts');
         LEAVE `whole_proc`;
     END IF;
 END;
@@ -273,4 +299,3 @@ IF NEW.entity_id='binary_sensor.guest_motion' THEN
 END;
 $$
 DELIMITER ;
-

@@ -47,6 +47,12 @@ query = "SELECT time AS 'Time', value AS 'Living' FROM `{my_schema}`.`living_tem
 variableNames = [ "Living",]
 datafile = "LivingTemps.csv"
 dataname = "LIVING TEMP"
+[[RCTemps.items]]
+# Get average temperature between 0800 and 1600 PST
+query = "SELECT timestampadd(hour, 12, date(date)) AS 'Time', ROUND(AVG(temp2f),1) AS 'AvgDayTemp' FROM `{my_schema}`.`rcweather` WHERE MOD(dateutc, 86400000)/1000 BETWEEN 57600 AND 86399 AND date > '{BeginDate}' GROUP BY DATE(`date`) ORDER BY 'date'"
+variableNames = [ "AvgDaily",]
+datafile = "AvgDaily.csv"
+dataname = "AVEAGE DAILY TEMP"
 
 [RCHeaters]
 GraphTitle = "Ridgecrest Heaters"

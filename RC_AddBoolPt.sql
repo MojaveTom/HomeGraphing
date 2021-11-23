@@ -153,6 +153,36 @@ DELIMITER ;
 
 DELIMITER $$
 
+CREATE OR REPLACE PROCEDURE add_pt_to_gate_open ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
+    BEGIN
+        SET @newT = newTime;
+        SET @newV = newval;
+
+        SELECT count(*) INTO @rowCount FROM `demay_farm`.`gate_open`;
+        IF @rowCount > 1 THEN
+            SELECT MAX(Id) INTO @theId FROM `demay_farm`.`gate_open`;
+            SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `demay_farm`.`gate_open` WHERE Id = @theId LIMIT 1;
+            SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `demay_farm`.`gate_open` WHERE Id = @theId - 1 LIMIT 1;
+            -- select "Update the time on the last row to the current time (minus 1 microsec)";
+            UPDATE `demay_farm`.`gate_open` SET Time = TIMESTAMPADD(MICROSECOND, -1, @newT) WHERE Id = @theId;
+            SET @dur = UNIX_TIMESTAMP(@newT) - UNIX_TIMESTAMP(@prevTm1);
+            -- select "Update the duration on the last TWO rows to the current duration.";
+            UPDATE `demay_farm`.`gate_open` SET duration = @dur WHERE Id >= @iDm1;
+            IF (@prevVal != @newV) THEN
+                INSERT INTO `demay_farm`.`gate_open` VALUES (DEFAULT, @newT, @newV, 0);
+                INSERT INTO `demay_farm`.`gate_open` VALUES (DEFAULT, TIMESTAMPADD(MICROSECOND, 1, @newT), @newV, 0);
+            END IF;
+        ELSE
+            -- select "Inserting first rows.";
+            INSERT INTO `demay_farm`.`gate_open` VALUES (DEFAULT, @newT, @newV, 0);
+        END IF;
+    END;
+$$
+
+DELIMITER ;
+
+DELIMITER $$
+
 CREATE OR REPLACE PROCEDURE add_pt_to_kitchenMTH_motion ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
     BEGIN
         SET @newT = newTime;
@@ -376,6 +406,7 @@ CREATE TABLE `demay_farm`.`pressure_pump` LIKE BoolTableTemplate;
 CREATE TABLE `demay_farm`.`submersible_pump` LIKE BoolTableTemplate;
 
 CREATE TABLE `demay_farm`.`kitchen_motion` LIKE BoolTableTemplate;
+CREATE TABLE `demay_farm`.`gate_open` LIKE BoolTableTemplate;
 CREATE TABLE `demay_farm`.`dining_motion` LIKE BoolTableTemplate;
 CREATE TABLE `demay_farm`.`living_motion` LIKE BoolTableTemplate;
 CREATE TABLE `demay_farm`.`computer_motion` LIKE BoolTableTemplate;

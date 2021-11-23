@@ -69,6 +69,15 @@ DELIMITER ;
 
 DELIMITER $$
 /*[begin_label:]*/
+FOR rec IN ( SELECT RecTime AS t, message AS m FROM `demay_farm`.`mqttmessages` WHERE topic = 'e8db84e569cf/data' AND RecTime > '2021-10-24 14:24:00' )
+DO CALL add_pt_to_gate_open(rec.t, json_value(rec.m, '$.GateOpen'));
+END FOR;
+ /*[ end_label ]*/
+$$
+DELIMITER ;
+
+DELIMITER $$
+/*[begin_label:]*/
 -- FOR rec IN ( SELECT RecTime AS t, message AS m FROM `demay_farm`.`mqttmessages` WHERE topic = 'cc50e3550d5b/data' AND RecTime > timestampadd(day, -90, now()) )
 -- DO INSERT IGNORE INTO `demay_farm`.`master_temp` SET time = rec.t, value = json_value(rec.m, '$.Temperature');
 -- END FOR;
@@ -172,8 +181,11 @@ BEGIN
         INSERT IGNORE INTO `demay_farm`.`kitchenMTH_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.Humidity');
         LEAVE `whole_proc`;
     END IF;
-    /* Gate data.  */
+    /* Gate data.
+    {"MachineID":"e8db84e569cf","SampleTime":"2021-11-20 08:24:24-0800","GateOpen":false,"GateAngle":1.098096,"BatteryVolts":12.9639,"PublishReason":"----","RawX":462,"RawY":-296,"RawZ":-335,"GateOperate":false}
+      */
     IF NEW.topic = 'e8db84e569cf/data' THEN
+        CALL  add_pt_to_gate_open(NEW.rectime, json_value(NEW.message, '$.GateOpen'));
         INSERT IGNORE INTO `demay_farm`.`gate_angle` SET time = NEW.RecTime, value = json_value(NEW.message, '$.GateAngle');
         INSERT IGNORE INTO `demay_farm`.`gate_battery` SET time = NEW.RecTime, value = json_value(NEW.message, '$.BatteryVolts');
         LEAVE `whole_proc`;

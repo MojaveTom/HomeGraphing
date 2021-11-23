@@ -48,8 +48,8 @@ variableNames = [ "Living",]
 datafile = "LivingTemps.csv"
 dataname = "LIVING TEMP"
 [[RCTemps.items]]
-# Get average temperature between 0800 and 1600 PST
-query = "SELECT timestampadd(hour, 12, date(date)) AS 'Time', ROUND(AVG(temp2f),1) AS 'AvgDayTemp' FROM `{my_schema}`.`rcweather` WHERE MOD(dateutc, 86400000)/1000 BETWEEN 57600 AND 86399 AND date > '{BeginDate}' GROUP BY DATE(`date`) ORDER BY 'date'"
+# Get average temperature between 0800 and 1600 PT
+query = "SELECT timestampadd(hour, 12, date(date)) AS 'Time', ROUND(AVG(temp2f),1) AS 'AvgDayTemp' FROM `{my_schema}`.`rcweather` WHERE TIME(Date) BETWEEN '08:00' AND '16:00' AND date < DATE(NOW()) AND date > '{BeginDate}' GROUP BY DATE(`date`) ORDER BY 'date'"
 variableNames = [ "AvgDaily",]
 datafile = "AvgDaily.csv"
 dataname = "AVEAGE DAILY TEMP"
@@ -225,6 +225,45 @@ variableNames = [ "Outside",]
 datafile = "RcOutTemps.csv"
 axisNum = 0
 dataname = "OUTSIDE TEMP"
+
+[RCGate]
+GraphTitle = "Ridgecrest Gate"
+outputFile = "RCGate.htm"
+DBHost = "RC"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[RCGate.Yaxes]]
+title = "Angle °"
+color_map = "Reds"
+color = "black"
+[[RCGate.Yaxes]]
+title = "Gate Open (sec)"
+color_map = "Blues"
+color = "blue"
+location = "left"
+[[RCGate.Yaxes]]
+title = "Battery Volts"
+color_map = "Greens"
+color = "green"
+location = "right"
+[[RCGate.items]]
+query = "SELECT Time AS 'Time', value AS 'Angle' FROM `{my_schema}`.`gate_angle` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Angle",]
+datafile = "RcGateAngle.csv"
+axisNum = 0
+dataname = "GATE ANGLE"
+[[RCGate.items]]
+query = "SELECT Time AS 'Time', value AS 'Battery' FROM `{my_schema}`.`gate_battery` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Battery",]
+datafile = "RcGateBattery.csv"
+axisNum = 2
+dataname = "GATE BATTERY"
+[[RCGate.items]]
+query = "SELECT Time AS 'Time', Value*Duration AS 'Gate Open' FROM `{my_schema}`.`gate_open` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Gaate Open", ]
+datafile = "GateOpen.csv"
+axisNum = 1
+dataname = "GATE OPEN"
 
 [RCBooster]
 GraphTitle = "Ridgecrest Pressure Booster"
@@ -753,7 +792,7 @@ variableNames = [ "Living",]
 datafile = "SSLivingLight.csv"
 dataname = "LIVING LIGHT"
 [[SSLights.items]]
-query = "SELECT time AS 'Time', value AS 'Kitchen' FROM `{my_schema}`.`kitchen_light` WHERE time > '{BeginDate}' AND value < 2000 AND value >= 0 ORDER BY time"
+query = "SELECT time AS 'Time', value * 0.4 AS 'Kitchen' FROM `{my_schema}`.`kitchen_light` WHERE time > '{BeginDate}' AND value < 2000 AND value >= 0 ORDER BY time"
 variableNames = [ "Kitchen",]
 datafile = "SSKitchenLight.csv"
 dataname = "KITCHEN LIGHT"

@@ -483,8 +483,8 @@ datafile = "SSGarageTemp.csv"
 axisNum = 0
 dataname = "SS Garage Temperature"
 [[SSFurnace.items]]
-query = "SELECT time AS 'Time', value AS 'Humidity' FROM `{my_schema}`.`garage_hum` WHERE time  > '{BeginDate}' AND value < 110 ORDER BY time"
-variableNames = [ "Humidity",]
+query = "SELECT time AS 'Time', value AS 'Garage Humidity' FROM `{my_schema}`.`garage_hum` WHERE time  > '{BeginDate}' AND value < 110 ORDER BY time"
+variableNames = [ "Garage Humidity",]
 datafile = "SSGarageHumidity.csv"
 axisNum = 0
 dataname = "SS Garage Humidity"
@@ -699,7 +699,7 @@ variableNames = [ "Master",]
 datafile = "SSMasterTemps.csv"
 dataname = "MASTER TEMP"
 [[SSTemps.items]]
-query = "SELECT RecTime AS 'Time', json_value(message, '$.Temperature') AS 'Master Window' FROM `{my_schema}`.`mqttmessages` WHERE ((topic='a020a6135ed9/data' AND RecTime < '2019-11-16 17:00') OR (topic='3c71bf36eb61/data' AND RecTime > '2019-11-16 16:39')) AND json_value(message, '$.Temperature') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+query = "SELECT RecTime AS 'Time', json_value(message, '$.Temperature') AS 'Master Window' FROM `{my_schema}`.`mqttmessages` WHERE topic='3c71bf36eb61/data' AND json_value(message, '$.Temperature') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
 variableNames = [ "MasterWindow",]
 datafile = "SSMasterWindowTemps.csv"
 dataname = "MASTER WINDOW TEMP"
@@ -865,7 +865,7 @@ variableNames = [ "Master",]
 datafile = "SSMasterHums.csv"
 dataname = "MASTER HUMIDITY"
 [[SSHums.items]]
-query = "SELECT RecTime AS 'Time', ROUND(json_value(message, '$.Humidity'),1) AS 'Master Window' FROM `{my_schema}`.`mqttmessages` WHERE ((topic='a020a6135ed9/data' AND RecTime < '2019-11-16 17:00') OR (topic='3c71bf36eb61/data' AND RecTime > '2019-11-16 16:39')) AND json_value(message, '$.Humidity') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
+query = "SELECT RecTime AS 'Time', ROUND(json_value(message, '$.Humidity'),1) AS 'Master Window' FROM `{my_schema}`.`mqttmessages` WHERE topic='3c71bf36eb61/data' AND json_value(message, '$.Humidity') < 150 AND RecTime  > '{BeginDate}' AND RecTime  < now(6) ORDER BY RecTime"
 variableNames = [ "Master Window",]
 datafile = "SSMasterWindowHumidity.csv"
 dataname = "SS MASTER WINDOW HUMIDITY"
@@ -901,8 +901,8 @@ variableNames = [ "Mud",]
 datafile = "SSMudHums.csv"
 dataname = "MUD HUMIDITY"
 [[SSHums.items]]
-query = "SELECT time AS 'Time', value AS 'Humidity' FROM `{my_schema}`.`garage_hum` WHERE time  > '{BeginDate}' AND value < 110 ORDER BY time"
-variableNames = [ "Humidity",]
+query = "SELECT time AS 'Time', value AS 'Garage Humidity' FROM `{my_schema}`.`garage_hum` WHERE time  > '{BeginDate}' AND value < 110 ORDER BY time"
+variableNames = [ "Garage Humidity",]
 datafile = "SSGarageHumidity.csv"
 axisNum = 0
 dataname = "SS Garage Humidity"

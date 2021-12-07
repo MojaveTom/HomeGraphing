@@ -70,6 +70,19 @@ END FOR;
 $$
 DELIMITER ;
 
+DELIMITER $$
+/*[begin_label:]*/
+FOR rec IN ( SELECT RecTime AS t, message AS m FROM `steamboat`.`mqttmessages` WHERE topic = 'dc4f225f31f6/data' AND RecTime > timestampadd(day, -10, now()) )
+DO
+  CALL add_pt_to_kitchen_motion(rec.t, json_value(rec.m, '$.MotionDetected') = 'ON');
+  INSERT IGNORE INTO `steamboat`.`kitchen_temp` SET time = rec.t, value = json_value(rec.m, '$.Temperature');
+  INSERT IGNORE INTO `steamboat`.`kitchen_hum` SET time = rec.t, value = json_value(rec.m, '$.Humidity');
+  INSERT IGNORE INTO `steamboat`.`kitchen_light` SET time = rec.t, value = json_value(rec.m, '$.LightValue');
+END FOR;
+ /*[ end_label ]*/
+$$
+DELIMITER ;
+
 /**********************  Load new motion tables from old.   *********************************/
 RENAME TABLE mud_motion TO mud_motion_old;
 CREATE TABLE mud_motion like BoolTableTemplate;
@@ -143,6 +156,17 @@ BEGIN
     */
     IF NEW.topic = 'cc50e3c704c5/data' THEN
         CALL  add_pt_to_guest_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
+        LEAVE `whole_proc`;
+    END IF;
+    /* Kitchen message example:
+    dc4f225f31f6/data {"MachineID":"dc4f225f31f6","SampleTime":"2021-11-17 13:59:41-0700","MotionDetected":"OFF","MotionVal":"   ",
+      "Temperature":67.64,"Humidity":41.5,"ConsolePower":"ON","TodayMissingWxReports":4,"LightValue":913,"PublishReason":"-----"}
+    */
+    IF NEW.topic = 'dc4f225f31f6/data' THEN
+        CALL  add_pt_to_kitchen_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
+        INSERT IGNORE INTO `steamboat`.`kitchen_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.Temperature');
+        INSERT IGNORE INTO `steamboat`.`kitchen_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.Humidity');
+        INSERT IGNORE INTO `steamboat`.`kitchen_light` SET time = NEW.rectime, value = json_value(NEW.message, '$.LightValue');
         LEAVE `whole_proc`;
     END IF;
 END;

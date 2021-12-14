@@ -563,6 +563,7 @@ def main():
                     ShowGraph(GraphDefs[k])
         # "DBEngine" and "conn" items in DBHostDict are not serializable, so can't dump them
     # debug('DBHostDict is: %s' % json.dumps(DBHostDict, indent=2))
+        Eng.dispose()
 
 if __name__ == "__main__":
     info(f'####################  {ProgName} starts  @  {dt.now().isoformat(sep=" ")}   #####################')

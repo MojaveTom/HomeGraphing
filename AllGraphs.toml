@@ -52,7 +52,7 @@ dataname = "LIVING TEMP"
 query = "SELECT timestampadd(hour, 12, date(date)) AS 'Time', ROUND(AVG(temp2f),1) AS 'AvgDayTemp' FROM `{my_schema}`.`rcweather` WHERE TIME(Date) BETWEEN '08:00' AND '16:00' AND date < DATE(NOW()) AND date > '{BeginDate}' GROUP BY DATE(`date`) ORDER BY 'date'"
 variableNames = [ "AvgDaily",]
 datafile = "AvgDaily.csv"
-dataname = "AVEAGE DAILY TEMP"
+dataname = "AVERAGE DAILY TEMP"
 
 [RCHeaters]
 GraphTitle = "Ridgecrest Heaters"

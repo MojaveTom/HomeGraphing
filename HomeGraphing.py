@@ -386,7 +386,8 @@ def ShowGraph(graphDict):
     f = open(graphDict["outputFile"], mode='w')
     f.write(html)
     f.close()
-    view(graphDict["outputFile"], new='tab')
+    if PP.ShowGraph:
+        view(graphDict["outputFile"], new='tab')
 
 def main():
     global DelOldCsv, SaveCSVData, DBHostDict, LocalDataOnly, DatabaseReadDelta, helperFunctionLoggingLevel, PP

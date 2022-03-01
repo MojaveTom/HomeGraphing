@@ -156,6 +156,16 @@ dest = "LocalDataOnly"
 action = "store_true"
 
 [[Parameters]]
+paramName = "ShowGraph"
+type = "bool"
+description = "Actually display, don't just create html file."
+default = ""        # bool("") is false; bool("nonempty") is true
+[Parameters.argParserArgs]
+long = "--ShowGraph"
+dest = "ShowGraph"
+action = "store_true"
+
+[[Parameters]]
 paramName = "DeleteOldCSVData"
 type = "bool"
 description = "Delete any existing CSV data for selected graphs before retrieving new."

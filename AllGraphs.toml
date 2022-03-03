@@ -382,7 +382,7 @@ XaxisTitle = "Date/Time"
 title = "Gallons Per Minute"
 color = "black"
 [[RCWater.Yaxes]]
-title = "Watts"
+title = "kiloWatts"
 color_map = "Reds"
 color = "red"
 location = "right"
@@ -405,7 +405,7 @@ datafile = "MasterValveON.csv"
 axisNum = 0
 dataname = "RC Master Valve ON"
 [[RCWater.items]]
-query = "SELECT Time AS 'Time', AvgWaterPowerW AS 'Well Power' FROM `{my_schema}`.`MeterData` WHERE Time > '{BeginDate}' ORDER BY Time"
+query = "SELECT Time AS 'Time', AvgWaterPowerW/1000 AS 'Well Power' FROM `{my_schema}`.`MeterData` WHERE Time > '{BeginDate}' ORDER BY Time"
 variableNames = [ "Well Power",]
 datafile = "WellPower.csv"
 axisNum = 1

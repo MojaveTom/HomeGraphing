@@ -734,22 +734,22 @@ variableNames = [ "Mud",]
 datafile = "SSMudTemps.csv"
 dataname = "MUD TEMP"
 [[SSTemps.items]]
-query = "SELECT time AS 'Time', value AS 'Temp' FROM `{my_schema}`.`garage_temp` WHERE time  > '{BeginDate}' AND value < 150 ORDER BY time"
+query = "SELECT time AS 'Time', value AS 'Garage' FROM `{my_schema}`.`garage_temp` WHERE time  > '{BeginDate}' AND value < 150 ORDER BY time"
 variableNames = [ "Garage",]
 datafile = "SSGarageTemp.csv"
 axisNum = 0
 dataname = "SS Garage Temperature"
 [[SSTemps.items]]
+query = "SELECT date AS 'Time', tempinf AS 'Hallway', tempf AS 'Outside', tempinf AS 'Hallway' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Hallway", "Outside",]
+datafile = "SSWeatherTemps.csv"
+axisNum = 0
+dataname = "SS OUTSIDE/INSIDE TEMPS"
+[[SSTemps.items]]
 query = "SELECT time AS 'Time', (duration * value) / 60 AS 'Fan (min)' FROM `{my_schema}`.`furnace_fan` WHERE  time  > '{BeginDate}' ORDER BY Time"
 variableNames = [ "Fan (min)",]
 datafile = "SSFurnaceFan.csv"
 dataname = "SS FURNACE FAN"
-[[SSTemps.items]]
-query = "SELECT date AS 'Time', tempf AS 'Outside', tempinf AS 'Hallway' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
-variableNames = [ "Outside", "Hallway",]
-datafile = "SSWeatherTemps.csv"
-axisNum = 0
-dataname = "SS OUTSIDE/INSIDE TEMPS"
 
 [SSLights]
 GraphTitle = "Steamboat Light"

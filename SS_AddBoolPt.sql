@@ -63,6 +63,36 @@ DELIMITER ;
 
 DELIMITER $$
 
+CREATE OR REPLACE PROCEDURE add_pt_to_craft_motion ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
+    BEGIN
+        SET @newT = newTime;
+        SET @newV = newval;
+
+        SELECT count(*) INTO @rowCount FROM `steamboat`.`craft_motion`;
+        IF @rowCount > 1 THEN
+            SELECT MAX(Id) INTO @theId FROM `steamboat`.`craft_motion`;
+            SELECT Id, Time, Value INTO @iD, @prevT, @prevVal FROM `steamboat`.`craft_motion` WHERE Id = @theId LIMIT 1;
+            SELECT Id, Time, Value INTO @iDm1, @prevTm1, @prevValm1 FROM `steamboat`.`craft_motion` WHERE Id = @theId - 1 LIMIT 1;
+            -- select "Update the time on the last row to the current time (minus 1 microsec)";
+            UPDATE `steamboat`.`craft_motion` SET Time = TIMESTAMPADD(MICROSECOND, -1, @newT) WHERE Id = @theId;
+            SET @dur = UNIX_TIMESTAMP(@newT) - UNIX_TIMESTAMP(@prevTm1);
+            -- select "Update the duration on the last TWO rows to the current duration.";
+            UPDATE `steamboat`.`craft_motion` SET duration = @dur WHERE Id >= @iDm1;
+            IF (@prevVal != @newV) THEN
+                INSERT INTO `steamboat`.`craft_motion` VALUES (DEFAULT, @newT, @newV, 0);
+                INSERT INTO `steamboat`.`craft_motion` VALUES (DEFAULT, TIMESTAMPADD(MICROSECOND, 1, @newT), @newV, 0);
+            END IF;
+        ELSE
+            -- select "Inserting first rows.";
+            INSERT INTO `steamboat`.`craft_motion` VALUES (DEFAULT, @newT, @newV, 0);
+        END IF;
+    END;
+$$
+
+DELIMITER ;
+
+DELIMITER $$
+
 CREATE OR REPLACE PROCEDURE add_pt_to_garage_motion ( newTime DATETIME(6), newval BOOLEAN) MODIFIES SQL DATA
     BEGIN
         SET @newT = newTime;

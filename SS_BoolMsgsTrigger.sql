@@ -83,6 +83,19 @@ END FOR;
 $$
 DELIMITER ;
 
+DELIMITER $$
+/*[begin_label:]*/
+FOR rec IN ( SELECT RecTime AS t, message AS m FROM `steamboat`.`mqttmessages` WHERE topic = 'a020a6135ed9/data' AND RecTime > timestampadd(day, -22, now()) )
+DO
+  CALL add_pt_to_craft_motion(rec.t, json_value(rec.m, '$.MotionDetected') = 'ON');
+  INSERT IGNORE INTO `steamboat`.`craft_temp` SET time = rec.t, value = json_value(rec.m, '$.Temperature');
+  INSERT IGNORE INTO `steamboat`.`craft_hum` SET time = rec.t, value = json_value(rec.m, '$.Humidity');
+  INSERT IGNORE INTO `steamboat`.`craft_light` SET time = rec.t, value = json_value(rec.m, '$.LightValue');
+END FOR;
+ /*[ end_label ]*/
+$$
+DELIMITER ;
+
 /**********************  Load new motion tables from old.   *********************************/
 RENAME TABLE mud_motion TO mud_motion_old;
 CREATE TABLE mud_motion like BoolTableTemplate;
@@ -158,7 +171,7 @@ BEGIN
         CALL  add_pt_to_guest_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
         LEAVE `whole_proc`;
     END IF;
-    /* Kitchen message example:
+    /* Kitchen message example:   a020a6135ed9
     dc4f225f31f6/data {"MachineID":"dc4f225f31f6","SampleTime":"2021-11-17 13:59:41-0700","MotionDetected":"OFF","MotionVal":"   ",
       "Temperature":67.64,"Humidity":41.5,"ConsolePower":"ON","TodayMissingWxReports":4,"LightValue":913,"PublishReason":"-----"}
     */
@@ -167,6 +180,17 @@ BEGIN
         INSERT IGNORE INTO `steamboat`.`kitchen_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.Temperature');
         INSERT IGNORE INTO `steamboat`.`kitchen_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.Humidity');
         INSERT IGNORE INTO `steamboat`.`kitchen_light` SET time = NEW.rectime, value = json_value(NEW.message, '$.LightValue');
+        LEAVE `whole_proc`;
+    END IF;
+    /* Craft message example:
+    a020a6135ed9/data {"MachineID":"a020a6135ed9","SampleTime":"2022-03-18 10:26:49-0600","MotionDetected":"OFF",
+    "Temperature":59.72,"Humidity":30.2,"LightLevel":104,"PublishReason":"----"}
+    */
+    IF NEW.topic = 'a020a6135ed9/data' THEN
+        CALL  add_pt_to_craft_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
+        INSERT IGNORE INTO `steamboat`.`craft_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.Temperature');
+        INSERT IGNORE INTO `steamboat`.`craft_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.Humidity');
+        INSERT IGNORE INTO `steamboat`.`craft_light` SET time = NEW.rectime, value = json_value(NEW.message, '$.LightValue');
         LEAVE `whole_proc`;
     END IF;
 END;
@@ -205,6 +229,11 @@ CREATE TABLE IF NOT EXISTS  `steamboat`.`kitchen_hum` LIKE  `steamboat`.`test`;
 CREATE TABLE IF NOT EXISTS  `steamboat`.`kitchen_light` LIKE  `steamboat`.`test`;
 CREATE TABLE IF NOT EXISTS  `steamboat`.`kitchen_motion` LIKE  `steamboat`.`BoolTableTemplate`;
 CREATE TABLE IF NOT EXISTS  `steamboat`.`kitchen_uv` LIKE  `steamboat`.`test`;
+
+CREATE TABLE IF NOT EXISTS  `steamboat`.`craft_temp` LIKE  `steamboat`.`test`;
+CREATE TABLE IF NOT EXISTS  `steamboat`.`craft_hum` LIKE  `steamboat`.`test`;
+CREATE TABLE IF NOT EXISTS  `steamboat`.`craft_light` LIKE  `steamboat`.`test`;
+CREATE TABLE IF NOT EXISTS  `steamboat`.`craft_motion` LIKE  `steamboat`.`BoolTableTemplate`;
 
 CREATE TABLE IF NOT EXISTS  `steamboat`.`computer_temp` LIKE  `steamboat`.`test`;
 CREATE TABLE IF NOT EXISTS  `steamboat`.`computer_hum` LIKE  `steamboat`.`test`;

@@ -714,12 +714,6 @@ variableNames = [ "Computer",]
 datafile = "SSComputerTemps.csv"
 dataname = "COMPUTER TEMP"
 [[SSTemps.items]]
-query = "SELECT date AS 'Time', tempf AS 'Outside', tempinf AS 'Hallway' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
-variableNames = [ "Outside", "Hallway",]
-datafile = "SSWeatherTemps.csv"
-axisNum = 0
-dataname = "SS OUTSIDE/INSIDE TEMPS"
-[[SSTemps.items]]
 query = "SELECT time AS 'Time', value AS 'Living' FROM `{my_schema}`.`living_temp` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Living",]
 datafile = "SSLivingTemps.csv"
@@ -729,6 +723,11 @@ query = "SELECT time AS 'Time', value AS 'Kitchen' FROM `{my_schema}`.`kitchen_t
 variableNames = [ "Kitchen",]
 datafile = "SSKitchenTemps.csv"
 dataname = "KITCHEN TEMP"
+[[SSTemps.items]]
+query = "SELECT time AS 'Time', value AS 'Craft' FROM `{my_schema}`.`craft_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Craft",]
+datafile = "SSCraftTemps.csv"
+dataname = "CRAFT TEMP"
 [[SSTemps.items]]
 query = "SELECT time AS 'Time', value AS 'Mud' FROM `{my_schema}`.`mud_temp` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Mud",]
@@ -745,6 +744,12 @@ query = "SELECT time AS 'Time', (duration * value) / 60 AS 'Fan (min)' FROM `{my
 variableNames = [ "Fan (min)",]
 datafile = "SSFurnaceFan.csv"
 dataname = "SS FURNACE FAN"
+[[SSTemps.items]]
+query = "SELECT date AS 'Time', tempf AS 'Outside', tempinf AS 'Hallway' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
+variableNames = [ "Outside", "Hallway",]
+datafile = "SSWeatherTemps.csv"
+axisNum = 0
+dataname = "SS OUTSIDE/INSIDE TEMPS"
 
 [SSLights]
 GraphTitle = "Steamboat Light"
@@ -797,6 +802,11 @@ variableNames = [ "Kitchen",]
 datafile = "SSKitchenLight.csv"
 dataname = "KITCHEN LIGHT"
 [[SSLights.items]]
+query = "SELECT time AS 'Time', value * 0.4 AS 'Craft' FROM `{my_schema}`.`craft_light` WHERE time > '{BeginDate}' AND value < 2000 AND value >= 0 ORDER BY time"
+variableNames = [ "Craft",]
+datafile = "SSCraftLight.csv"
+dataname = "CRAFT LIGHT"
+[[SSLights.items]]
 query = "SELECT time AS 'Time', value AS 'Mud' FROM `{my_schema}`.`mud_light` WHERE time > '{BeginDate}' AND value < 2000 AND value >= 0 ORDER BY time"
 variableNames = [ "Mud",]
 datafile = "SSMudLight.csv"
@@ -840,6 +850,11 @@ query = "SELECT time AS 'Time', value*11 AS 'Kitchen' FROM `{my_schema}`.`kitche
 variableNames = [ "Kitchen",]
 datafile = "SSKitchenMotion.csv"
 dataname = "SS KITCHEN MOTION"
+[[SSMotion.items]]
+query = "SELECT time AS 'Time', value*11 AS 'Craft' FROM `{my_schema}`.`craft_motion` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Craft",]
+datafile = "SSCraftMotion.csv"
+dataname = "SS CRAFT MOTION"
 [[SSMotion.items]]
 query = "SELECT time AS 'Time', value*10 AS 'Mud' FROM `{my_schema}`.`mud_motion` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Mud",]
@@ -895,6 +910,11 @@ query = "SELECT time AS 'Time', value AS 'Kitchen' FROM `{my_schema}`.`kitchen_h
 variableNames = [ "Kitchen",]
 datafile = "SSKitchenHums.csv"
 dataname = "KITCHEN HUMIDITY"
+[[SSHums.items]]
+query = "SELECT time AS 'Time', value AS 'Craft' FROM `{my_schema}`.`craft_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "Craft",]
+datafile = "SSCraftHums.csv"
+dataname = "CRAFT HUMIDITY"
 [[SSHums.items]]
 query = "SELECT time AS 'Time', value AS 'Mud' FROM `{my_schema}`.`mud_hum` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Mud",]

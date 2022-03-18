@@ -735,7 +735,7 @@ datafile = "SSMudTemps.csv"
 dataname = "MUD TEMP"
 [[SSTemps.items]]
 query = "SELECT time AS 'Time', value AS 'Temp' FROM `{my_schema}`.`garage_temp` WHERE time  > '{BeginDate}' AND value < 150 ORDER BY time"
-variableNames = [ "Temp",]
+variableNames = [ "Garage",]
 datafile = "SSGarageTemp.csv"
 axisNum = 0
 dataname = "SS Garage Temperature"

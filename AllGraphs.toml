@@ -850,11 +850,11 @@ query = "SELECT time AS 'Time', value*11 AS 'Kitchen' FROM `{my_schema}`.`kitche
 variableNames = [ "Kitchen",]
 datafile = "SSKitchenMotion.csv"
 dataname = "SS KITCHEN MOTION"
-[[SSMotion.items]]
-query = "SELECT time AS 'Time', value*11 AS 'Craft' FROM `{my_schema}`.`craft_motion` WHERE time > '{BeginDate}' ORDER BY time"
-variableNames = [ "Craft",]
-datafile = "SSCraftMotion.csv"
-dataname = "SS CRAFT MOTION"
+# [[SSMotion.items]]
+# query = "SELECT time AS 'Time', value*11 AS 'Craft' FROM `{my_schema}`.`craft_motion` WHERE time > '{BeginDate}' ORDER BY time"
+# variableNames = [ "Craft",]
+# datafile = "SSCraftMotion.csv"
+# dataname = "SS CRAFT MOTION"
 [[SSMotion.items]]
 query = "SELECT time AS 'Time', value*10 AS 'Mud' FROM `{my_schema}`.`mud_motion` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Mud",]

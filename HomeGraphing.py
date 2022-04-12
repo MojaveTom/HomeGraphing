@@ -322,7 +322,7 @@ def ShowGraph(graphDict):
                 major_tick_line_color=clr,
                 minor_tick_line_color=clr
             ), side)
-
+    debug(f'extra_y_ranges: {extra_y_ranges}')
 
     for i in range(len(graphDict['items'])):
         item = graphDict['items'][i]
@@ -366,7 +366,9 @@ def ShowGraph(graphDict):
                 debug('Executing line mod "%s"' % s)
                 exec(s)
             extra_y_ranges[yRangeName].renderers.append(r)
+            extra_y_ranges[yRangeName].names.append(thisCol)
             if item['includeInLegend']: legend.items.append(LegendItem(label=thisCol, renderers=[r]))
+    debug(f'extra_y_ranges: {extra_y_ranges}')
     plot.add_layout(legend)
     plot.legend.location = "top_left"
     plot.legend.click_policy = "mute"

@@ -215,7 +215,8 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
             debug('sql data index:\n%s', data.index)
             if CSVdataRead:
                 #  Have SQL data and have CSV data, put them together
-                data =  fdata.append(data, sort=True)
+                # data =  fdata.append(data, sort=True)
+                data = pd.concat((fdata, data), sort=True)
                 debug('appended data tail:\n%s', data.tail())
                 debug('appended data dtypes:\n%s', data.dtypes)
                 debug('appended data columns:\n%s', data.columns)

@@ -355,13 +355,15 @@ def ShowGraph(graphDict):
                 itemColor = ya['cmap'].nextColor(colorGroup)
             else:
                 debug('item color "%s" is defined in the item definition.' % itemColor)
-            r = eval('''plot.%s(x=data.column_names[0]
+            createPlotCmd = f'''plot.{item['lineType']}(x=data.column_names[0]
                 , y = thisCol
                 , source=data
                 , color = itemColor, alpha=0.5
                 , muted_color = itemColor, muted_alpha=1
                 , name = thisCol
-                , y_range_name=yRangeName)'''%item['lineType'])
+                , y_range_name=yRangeName)'''
+            debug(f'plot command is: "{createPlotCmd}" [thisCol is "{thisCol}"]')
+            r = eval(createPlotCmd)
             for (k, v) in item['lineMods'].items():
                 s = 'r.%s = %s'%(k, v)
                 debug('Executing line mod "%s"' % s)

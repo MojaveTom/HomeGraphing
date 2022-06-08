@@ -49,7 +49,7 @@ datafile = "LivingTemps.csv"
 dataname = "LIVING TEMP"
 [[RCTemps.items]]
 # Get average temperature between 0800 and 1600 PT
-query = "SELECT timestampadd(hour, 12, date(date)) AS 'Time', ROUND(AVG(temp2f),1) AS 'AvgDayTemp' FROM `{my_schema}`.`rcweather` WHERE TIME(Date) BETWEEN '08:00' AND '16:00' AND date < DATE(NOW()) AND date > '{BeginDate}' GROUP BY DATE(`date`) ORDER BY 'date'"
+query = "SELECT timestampadd(hour, 12, date(date)) AS 'Time', ROUND(AVG(tempf),1) AS 'AvgDayTemp' FROM `{my_schema}`.`rcweather` WHERE TIME(Date) BETWEEN '08:00' AND '16:00' AND date < DATE(NOW()) AND date > '{BeginDate}' GROUP BY DATE(`date`) ORDER BY 'date'"
 variableNames = [ "AvgDaily",]
 datafile = "AvgDaily.csv"
 dataname = "AVERAGE DAILY TEMP"

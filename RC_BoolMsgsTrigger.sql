@@ -129,6 +129,15 @@ END FOR;
 $$
 DELIMITER ;
 
+INSERT IGNORE INTO `demay_farm`.`thermostat_temp` (Time, value)
+  SELECT TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), last_updated), round(state) FROM `new_ha`.`states`
+  WHERE entity_id='sensor.thermostat_temperature'  AND last_updated > timestampadd(day, -90, now());
+
+INSERT IGNORE INTO `demay_farm`.`thermostat_hum` (Time, value)
+  SELECT TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), last_updated), round(state) FROM `new_ha`.`states`
+  WHERE entity_id='sensor.thermostat_humidity'  AND last_updated > timestampadd(day, -90, now());
+
+
 -- INSERT IGNORE INTO `demay_farm`.`computer_motion` (Time, Sensor, value)
 --   SELECT RecTime, "Computer Room", json_value(message, '$.MotionDetected') = 'ON' FROM `demay_far,`.`mqttmessages`
 --   WHERE topic = 'a020a613638e/data' AND SUBSTR(json_value(message, '$.PublishReason'),1,1) = 'M' ;
@@ -224,10 +233,19 @@ BEGIN
   INSERT IGNORE INTO `demay_farm`.`living_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
+
+ IF NEW.entity_id='sensor.thermostat_temperature' AND NEW.state NOT LIKE 'unknown' AND NEW.state > 0 THEN
+  INSERT IGNORE INTO `demay_farm`.`thermostat_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state);
+  LEAVE `whole_proc`;
+ END IF;
+
+ IF NEW.entity_id='sensor.thermostat_humidity' AND NEW.state NOT LIKE 'unknown' AND NEW.state > 0 THEN
+  INSERT IGNORE INTO `demay_farm`.`thermostat_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state);
+  LEAVE `whole_proc`;
+ END IF;
+
  IF NEW.state NOT LIKE 'unknown' AND NEW.entity_id='climate.thermostat' THEN
-  INSERT IGNORE INTO `demay_farm`.`thermostat_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(json_value(NEW.attributes,'$.current_temperature'));
-  INSERT IGNORE INTO `demay_farm`.`thermostat_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(json_value(NEW.attributes,'$.current_humidity'));
-  INSERT IGNORE INTO `demay_farm`.`ac_power` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=if(json_value(NEW.attributes,'$.hvac_action')='idle',0.0, if(json_value(NEW.attributes,'$.equipment_running')='compCool1,fan',2100.0, 100.0));
+  INSERT IGNORE INTO `demay_farm`.`ac_power` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=if(json_value(NEW.attributes,'$.hvac_action')='idle',0.0, if(json_value(NEW.attributes,'$.equipment_running')='compCool1,fan',2100.0, 0.0));
   LEAVE `whole_proc`;
  END IF;
 
@@ -289,7 +307,6 @@ BEGIN
   INSERT IGNORE INTO `demay_farm`.`lrlight_power` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=if(NEW.state='on', 100.0, 0.0);
   LEAVE `whole_proc`;
  END IF;
-
 
  IF NEW.entity_id='binary_sensor.living_motion' THEN
   CALL `demay_farm`.`add_pt_to_living_motion`(TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), NEW.state='on');

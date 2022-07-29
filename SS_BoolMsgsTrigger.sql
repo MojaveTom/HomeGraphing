@@ -297,112 +297,112 @@ BEGIN
 
     /*      MASTER BEDROOM SENSORS   */
  IF NEW.entity_id='sensor.masterbed_enviro_air_temperature' AND NEW.state < 140 AND NEW.state > -40 THEN
-  INSERT IGNORE INTO `steamboat`.`master_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`master_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.masterbed_enviro_humidity' AND NEW.state < 110 AND NEW.state > -10 THEN
-  INSERT IGNORE INTO `steamboat`.`master_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`master_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.masterbed_enviro_illuminance' THEN
-  INSERT IGNORE INTO `steamboat`.`master_light` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`master_light` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='binary_sensor.masterbed_enviro_home_security_motion_detection' THEN
-  CALL  `steamboat`.`add_pt_to_master_motion`(TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), (NEW.state = 'on'));
+  CALL  `steamboat`.`add_pt_to_master_motion`(TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), (NEW.state = 'on'));
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.masterwindowtemperature' THEN
-  INSERT IGNORE INTO `steamboat`.`master_uv` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`master_uv` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
 
     /*      LIVING ROOM SENSORS   */
  IF NEW.entity_id='sensor.livingroom_enviro_air_temperature' AND NEW.state < 140 AND NEW.state > -40 THEN
-  INSERT IGNORE INTO `steamboat`.`living_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`living_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.livingroom_enviro_humidity' AND NEW.state < 110 AND NEW.state > -10 THEN
-  INSERT IGNORE INTO `steamboat`.`living_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`living_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.livingroom_enviro_illuminance' THEN
-  INSERT IGNORE INTO `steamboat`.`living_light` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`living_light` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='binary_sensor.livingroom_enviro_home_security_motion_detection' THEN
-  CALL  `steamboat`.`add_pt_to_living_motion`(TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), (NEW.state = 'on'));
+  CALL  `steamboat`.`add_pt_to_living_motion`(TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), (NEW.state = 'on'));
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.livingroom_enviro_ultraviolet' THEN
-  INSERT IGNORE INTO `steamboat`.`living_uv` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`living_uv` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
 
     /*      COMPUTER ROOM SENSORS   */
  IF NEW.entity_id='sensor.office_enviro_air_temperature' AND NEW.state < 140 AND NEW.state > -40 THEN
-  INSERT IGNORE INTO `steamboat`.`computer_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`computer_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.office_enviro_humidity' AND NEW.state < 110 AND NEW.state > -10 THEN
-  INSERT IGNORE INTO `steamboat`.`computer_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`computer_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.office_enviro_illuminance' THEN
-  INSERT IGNORE INTO `steamboat`.`computer_light` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`computer_light` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='binary_sensor.office_enviro_home_security_motion_detection' THEN
-  CALL  `steamboat`.`add_pt_to_computer_motion`(TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), (NEW.state = 'on'));
+  CALL  `steamboat`.`add_pt_to_computer_motion`(TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), (NEW.state = 'on'));
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.office_enviro_ultraviolet' THEN
-  INSERT IGNORE INTO `steamboat`.`computer_uv` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`computer_uv` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
 
     /*      KITCHEN SENSORS   */
  IF NEW.entity_id='sensor.kitchen_enviro_air_temperature' AND NEW.state < 140 AND NEW.state > -40 THEN
-  INSERT IGNORE INTO `steamboat`.`kitchen_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`kitchen_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.kitchen_enviro_humidity' AND NEW.state < 110 AND NEW.state > -10 THEN
-  INSERT IGNORE INTO `steamboat`.`kitchen_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`kitchen_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.kitchen_enviro_illuminance' THEN
-  INSERT IGNORE INTO `steamboat`.`kitchen_light` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`kitchen_light` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='binary_sensor.kitchen_enviro_home_security_motion_detection' THEN
-  CALL  `steamboat`.`add_pt_to_kitchen_motion`(TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), (NEW.state = 'on'));
-  INSERT IGNORE INTO `steamboat`.`kitchen_motion` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=(NEW.state = 'on');
+  CALL  `steamboat`.`add_pt_to_kitchen_motion`(TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), (NEW.state = 'on'));
+  INSERT IGNORE INTO `steamboat`.`kitchen_motion` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=(NEW.state = 'on');
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.kitchen_enviro_ultraviolet' THEN
-  INSERT IGNORE INTO `steamboat`.`kitchen_uv` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`kitchen_uv` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
 
     /*      MUD ROOM SENSORS   */
  IF NEW.entity_id='sensor.mudroom_enviro_air_temperature' AND NEW.state < 140 AND NEW.state > -40 THEN
-  INSERT IGNORE INTO `steamboat`.`mud_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`mud_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.mudroom_enviro_humidity' AND NEW.state < 110 AND NEW.state > -10 THEN
-  INSERT IGNORE INTO `steamboat`.`mud_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`mud_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.mudroom_enviro_illuminance' THEN
-  INSERT IGNORE INTO `steamboat`.`mud_light` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`mud_light` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='binary_sensor.mudroom_enviro_home_security_motion_detection' THEN
-  CALL  `steamboat`.`add_pt_to_mud_motion`(TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), (NEW.state = 'on'));
+  CALL  `steamboat`.`add_pt_to_mud_motion`(TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), (NEW.state = 'on'));
   LEAVE `whole_proc`;
  END IF;
  IF NEW.entity_id='sensor.mudroom_enviro_ultraviolet' THEN
-  INSERT IGNORE INTO `steamboat`.`mud_uv` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.created), value=round(NEW.state, 1);
+  INSERT IGNORE INTO `steamboat`.`mud_uv` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
 

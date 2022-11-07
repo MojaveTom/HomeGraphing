@@ -406,6 +406,32 @@ BEGIN
   LEAVE `whole_proc`;
  END IF;
 
+    /*     HEATERS   */
+ IF NEW.entity_id='sensor.office_heater_power' AND NEW.state >= 0 THEN
+  INSERT IGNORE INTO `steamboat`.`computer_heater_power` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
+  LEAVE `whole_proc`;
+ END IF;
+ IF NEW.entity_id='sensor.master_bed_heater_switch_power' AND NEW.state >= 0 THEN
+  INSERT IGNORE INTO `steamboat`.`master_heater_power` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
+  LEAVE `whole_proc`;
+ END IF;
+ IF NEW.entity_id='sensor.guest_heater_switch_power' AND NEW.state >= 0 THEN
+  INSERT IGNORE INTO `steamboat`.`guest_heater_power` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
+  LEAVE `whole_proc`;
+ END IF;
+ IF NEW.entity_id='sensor.kitchen_heater_power' AND NEW.state >= 0 THEN
+  INSERT IGNORE INTO `steamboat`.`kitchen_heater_power` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
+  LEAVE `whole_proc`;
+ END IF;
+ IF NEW.entity_id='sensor.craft_heater_power' AND NEW.state >= 0 THEN
+  INSERT IGNORE INTO `steamboat`.`craft_heater_power` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
+  LEAVE `whole_proc`;
+ END IF;
+ IF NEW.entity_id='sensor.living_heater_power' AND NEW.state >= 0 THEN
+  INSERT IGNORE INTO `steamboat`.`living_heater_power` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state, 1);
+  LEAVE `whole_proc`;
+ END IF;
+
 END; //
 
 DELIMITER ;

@@ -500,6 +500,51 @@ variableNames = [ "Garage Motion",]
 datafile = "SSGarageMotion.csv"
 dataname = "SS GARAGE MOTION"
 
+[SSHeaters]
+GraphTitle = "Steamboat Heater"
+outputFile = "SSHeaters.htm"
+DBHost = "SS"
+ShowGraph = true
+XaxisTitle = "Date/Time"
+[[SSHeaters.Yaxes]]
+title = "Watts"
+[[SSHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'MasterPower' FROM `{my_schema}`.`master_heater_power` WHERE time  > '{BeginDate}' ORDER BY time"
+variableNames = [ "MasterPower",]
+datafile = "SSMasterHeaterPower.csv"
+axisNum = 0
+dataname = "SS Master Heater Power"
+[[SSHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'GuestPower' FROM `{my_schema}`.`guest_heater_power` WHERE time  > '{BeginDate}' ORDER BY time"
+variableNames = [ "GuestPower",]
+datafile = "SSGuestHeaterPower.csv"
+axisNum = 0
+dataname = "SS Guest Heater Power"
+[[SSHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'OfficePower' FROM `{my_schema}`.`computer_heater_power` WHERE time  > '{BeginDate}' ORDER BY time"
+variableNames = [ "OfficePower",]
+datafile = "SSOfficeHeaterPower.csv"
+axisNum = 0
+dataname = "SS Office Heater Power"
+[[SSHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'CraftPower' FROM `{my_schema}`.`craft_heater_power` WHERE time  > '{BeginDate}' ORDER BY time"
+variableNames = [ "CraftPower",]
+datafile = "SSCraftHeaterPower.csv"
+axisNum = 0
+dataname = "SS Craft Heater Power"
+[[SSHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'LivingPower' FROM `{my_schema}`.`living_heater_power` WHERE time  > '{BeginDate}' ORDER BY time"
+variableNames = [ "LivingPower",]
+datafile = "SSLivingHeaterPower.csv"
+axisNum = 0
+dataname = "SS Living Heater Power"
+[[SSHeaters.items]]
+query = "SELECT time AS 'Time', value AS 'KitchenPower' FROM `{my_schema}`.`kitchen_heater_power` WHERE time  > '{BeginDate}' ORDER BY time"
+variableNames = [ "KitchenPower",]
+datafile = "SSKitchenHeaterPower.csv"
+axisNum = 0
+dataname = "SS Kitchen Heater Power"
+
 [SSMasterWindow]
 GraphTitle = "Steamboat Master Window"
 outputFile = "SSMasterWindow.htm"

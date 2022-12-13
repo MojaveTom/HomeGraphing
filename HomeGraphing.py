@@ -25,6 +25,7 @@ from datetime import time as dtime  #   https://docs.python.org/3/library/dateti
 from datetime import timedelta      #   https://docs.python.org/3/library/datetime.html#timedelta-objects
 import os               #   https://docs.python.org/3/library/os.html
 import sys              #   https://docs.python.org/3/library/sys.html
+import re               #   https://docs.python.org/3/library/re.html
 import argparse         #   https://docs.python.org/3/library/argparse.html
 import configparser     #   https://docs.python.org/3/library/configparser.html
 import logging          #   https://docs.python.org/3/library/logging.html
@@ -458,13 +459,19 @@ def main():
     # with a bunch of imports and code it doesn't need to do its job.
     DBHosts = set()
     gdks = set(GraphDefs.keys())
+    foundDesiredPlots = set()
     debug('Graphs defined in the graph defs file are: %s' % gdks)
     if len(desired_plots) > 0:
         plotlist = list(desired_plots)
         for plt in plotlist:
+            pat = re.compile(plt)
+            for aplt in list(gdks):
+                if pat.search(aplt):
+                    foundDesiredPlots.add(aplt)
             if plt not in gdks:
                 logger.warning('Plot: "%s" is unknown, and will be ignored.' % plt)
                 desired_plots.remove(plt)
+    desired_plots = foundDesiredPlots
     if len(desired_plots) == 0:     # no options given, and no config graphs, provide a default set.
         desired_plots = gdks        # all graphs
         debug('No known plots specified on command line; plot all known.')

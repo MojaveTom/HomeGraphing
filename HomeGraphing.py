@@ -36,6 +36,7 @@ import paho.mqtt.client as mqtt     #   https://www.eclipse.org/paho/clients/pyt
 import paho.mqtt.publish as publish
 
 from sqlalchemy import create_engine    #   https://docs.sqlalchemy.org/en/13/  https://docs.sqlalchemy.org/en/13/core/engines.html#sqlalchemy.create_engine
+from sqlalchemy.sql import text    #   https://docs.sqlalchemy.org/en/13/  https://docs.sqlalchemy.org/en/13/core/engines.html#sqlalchemy.create_engine
 # import pymysql as mysql             #   https://pymysql.readthedocs.io/en/latest/
 # import pymysql.err as Error
 
@@ -68,7 +69,7 @@ critical = logger.critical
 
 logger.level = logging.DEBUG
 
-helperFunctionLoggingLevel = logging.WARNING
+helperFunctionLoggingLevel = logging.DEBUG
 
 #########################################
 PP = Prodict()
@@ -204,7 +205,7 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
         debug('SQLbeginDate for creating SQL query %s', SQLbeginDate)
         myQuery = query.format(BeginDate=SQLbeginDate.isoformat())
         info('SQL query: %s', myQuery)
-        data = pd.read_sql_query(myQuery, DBConn, index_col='Time')
+        data = pd.read_sql_query(text(myQuery), DBConn, index_col='Time')
         if data.index.size != 0:
                 # Have SQL data
             debug('Num Points from SQL = %s', data.index.size)
@@ -215,8 +216,8 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
             debug('sql data index:\n%s', data.index)
             if CSVdataRead:
                 #  Have SQL data and have CSV data, put them together
-                # data =  fdata.append(data, sort=True)
-                data = pd.concat((fdata, data), sort=True)
+                data =  fdata.merge(data, sort=True)
+                # data = pd.concat([fdata, data], sort=True)
                 debug('appended data tail:\n%s', data.tail())
                 debug('appended data dtypes:\n%s', data.dtypes)
                 debug('appended data columns:\n%s', data.columns)
@@ -256,6 +257,7 @@ def GetData(fileName, query = None, dataTimeOffsetUTC = None, hostParams = dict(
     logger.setLevel(prevLogLevel)
     return data.query(slicer)       # return data from beginDate to  present
 
+
 def ShowGraph(graphDict):
 
     if not graphDict['ShowGraph']:
@@ -280,19 +282,19 @@ def ShowGraph(graphDict):
     plot = figure(title=graphDict['GraphTitle']
             , tools="pan,wheel_zoom,box_zoom,reset,save,box_select"
             , x_axis_type='datetime'
-            , plot_width=1600, plot_height=800
+            , width=1600, height=800
             , active_drag="box_zoom"
             , active_scroll = "wheel_zoom")
     plot.title.align = "center"
     plot.title.text_font_size = "25px"
     plot.xaxis.axis_label = graphDict['XaxisTitle']
     # plot.xaxis.ticker = DatetimeTicker(num_minor_ticks = 4)
-    plot.xaxis.formatter = DatetimeTickFormatter(seconds=["%M:%S"],
-                                            minutes=["%R"],
-                                            minsec=["%M:%S"],
-                                            hours=["%R"],
-                                            hourmin = ["%m/%d %R"],
-                                            days = ['%m/%d'])
+    plot.xaxis.formatter = DatetimeTickFormatter(seconds="%M:%S",
+                                            minutes="%R",
+                                            minsec="%M:%S",
+                                            hours="%R",
+                                            hourmin = "%m/%d %R",
+                                            days = '%m/%d')
     plot.toolbar.logo = None
     legend = Legend()
     # legend.items = [LegendItem(label="--- Left Axis ---"   , renderers=[])]
@@ -369,7 +371,7 @@ def ShowGraph(graphDict):
                 debug('Executing line mod "%s"' % s)
                 exec(s)
             extra_y_ranges[yRangeName].renderers.append(r)
-            extra_y_ranges[yRangeName].names.append(thisCol)
+            # extra_y_ranges[yRangeName].names.append(thisCol)
             if item['includeInLegend']: legend.items.append(LegendItem(label=thisCol, renderers=[r]))
     debug(f'extra_y_ranges: {extra_y_ranges}')
     plot.add_layout(legend)
@@ -553,7 +555,8 @@ def main():
         debug(Eng)
         with Eng.connect() as conn, conn.begin():
             dbhd['conn'] = conn
-            result = conn.execute("select timestampdiff(hour, utc_timestamp(), now());")
+            query = text("select timestampdiff(hour, utc_timestamp(), now());")
+            result = conn.execute(query)
             for row in result:
                 ServerTimeFromUTC = timedelta(hours=row[0])
             dbhd['twoWeeksAgo'] = (dt.utcnow() + ServerTimeFromUTC - timedelta(days=14))

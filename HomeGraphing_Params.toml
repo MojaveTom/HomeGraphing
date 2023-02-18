@@ -232,6 +232,8 @@ long = "--days"
 dest = "days"
 action = "store"
 
+# These parameters without an argParserArgs section are
+#   for passing on .ini file parameters (configName) to the program.
 [[Parameters]]
 paramName = "ss_my_schema"
 type = "str"

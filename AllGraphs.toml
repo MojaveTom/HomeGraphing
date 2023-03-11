@@ -38,6 +38,12 @@ variableNames = [ "Kitchen",]
 datafile = "KitchenTemps.csv"
 dataname = "KITCHEN TEMP"
 [[RCTemps.items]]
+query = "SELECT time AS 'Time', value AS 'KitchenMTH' FROM `{my_schema}`.`kitchenmth_temp` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "KitchenMTH",]
+datafile = "KitchenMTHTemp.csv"
+axisNum = 0
+dataname = "KITCHEN MTH TEMP"
+[[RCTemps.items]]
 query = "SELECT time AS 'Time', value AS 'Master' FROM `{my_schema}`.`master_temp` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Master",]
 datafile = "MasterTemps.csv"
@@ -189,6 +195,11 @@ query = "SELECT time AS 'Time', value AS 'Kitchen' FROM `{my_schema}`.`kitchen_h
 variableNames = [ "Kitchen",]
 datafile = "KitchenHums.csv"
 dataname = "KITCHEN HUMIDITY"
+[[RCHums.items]]
+query = "SELECT time AS 'Time', value AS 'KitchenMTH' FROM `{my_schema}`.`kitchenmth_hum` WHERE time > '{BeginDate}' ORDER BY time"
+variableNames = [ "KitchenMTH",]
+datafile = "KitchenMTHHums.csv"
+dataname = "KITCHEN MTH HUMIDITY"
 [[RCHums.items]]
 query = "SELECT time AS 'Time', value AS 'Master' FROM `{my_schema}`.`master_hum` WHERE time > '{BeginDate}' ORDER BY time"
 variableNames = [ "Master",]

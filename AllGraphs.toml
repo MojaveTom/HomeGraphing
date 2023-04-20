@@ -720,6 +720,13 @@ datafile = "SSWeatherLight.csv"
 axisNum = 1
 dataname = "SS OUTSIDE LIGHT"
 
+# [[SSSolar.items]]
+# query = "SELECT ina.Time AS 'Time', ina.WH - (select inv.WH FROM `{my_schema}`.`solarinverter_102` as inv where inv.Time > timestampadd(day, -1, ina.Time) limit 1) as '24HrWH' FROM `{my_schema}`.`solarinverter_102` AS ina WHERE ina.Time > '{BeginDate}' ORDER BY ina.Time"
+# variableNames = [ "24HrWH",]
+# datafile = "SSSolar24HrWH.csv"
+# axisNum = 0
+# dataname = "24 Hr WH"
+
 [SSMoteino]
 GraphTitle = "Steamboat Moteino Batteries"
 outputFile = "SSBattery.htm"

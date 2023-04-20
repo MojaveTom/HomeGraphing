@@ -104,15 +104,6 @@ DELIMITER ;
 
 DELIMITER $$
 /*[begin_label:]*/
-FOR rec IN ( SELECT TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), created) AS t, state FROM `new_ha`.`states` WHERE entity_id='binary_sensor.dining_motion' AND created > timestampadd(day, -90, now()) )
-DO   CALL `demay_farm`.`add_pt_to_dining_motion`(rec.t, rec.state='on');
-END FOR;
- /*[ end_label ]*/
-$$
-DELIMITER ;
-
-DELIMITER $$
-/*[begin_label:]*/
 FOR rec IN ( SELECT TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), created) AS t, state FROM `new_ha`.`states` WHERE entity_id='binary_sensor.living_motion' AND created > timestampadd(day, -90, now()) )
 DO   CALL `demay_farm`.`add_pt_to_living_motion`(rec.t, rec.state='on');
 END FOR;
@@ -136,6 +127,81 @@ INSERT IGNORE INTO `demay_farm`.`thermostat_temp` (Time, value)
 INSERT IGNORE INTO `demay_farm`.`thermostat_hum` (Time, value)
   SELECT TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), last_updated), round(state) FROM `new_ha`.`states`
   WHERE entity_id='sensor.thermostat_humidity'  AND last_updated > timestampadd(day, -90, now());
+
+DELIMITER $$
+/*[begin_label:]*/
+FOR rec IN ( SELECT RecTime AS t, JSON_VALUE(message, '$.dining_motion') as value FROM `demay_farm`.`mqttmessages` WHERE topic='haState/Motions/data' AND RecTime > timestampadd(day, -90, now()) )
+DO   CALL `demay_farm`.`add_pt_to_dining_motion`(rec.t, rec.value);
+END FOR;
+ /*[ end_label ]*/
+$$
+DELIMITER ;
+
+DELIMITER $$
+/*[begin_label:]*/
+FOR rec IN ( SELECT RecTime AS t, JSON_VALUE(message, '$.living_motion') as value FROM `demay_farm`.`mqttmessages` WHERE topic='haState/Motions/data' AND RecTime > timestampadd(day, -90, now()) )
+DO   CALL `demay_farm`.`add_pt_to_living_motion`(rec.t, rec.value);
+END FOR;
+ /*[ end_label ]*/
+$$
+DELIMITER ;
+
+DELIMITER $$
+/*[begin_label:]*/
+FOR rec IN ( SELECT RecTime AS t, JSON_VALUE(message, '$.guest_motion') as value FROM `demay_farm`.`mqttmessages` WHERE topic='haState/Motions/data' AND RecTime > timestampadd(day, -90, now()) )
+DO   CALL `demay_farm`.`add_pt_to_guest_motion`(rec.t, rec.value);
+END FOR;
+ /*[ end_label ]*/
+$$
+DELIMITER ;
+
+DELIMITER $$
+/*[begin_label:]*/
+FOR rec IN ( SELECT RecTime AS t, JSON_VALUE(message, '$.dining_motion') as value FROM `demay_farm`.`mqttmessages` WHERE topic='haState/Temps/data' AND RecTime > timestampadd(day, -90, now()) )
+DO   CALL `demay_farm`.`add_pt_to_dining_motion`(rec.t, rec.value);
+END FOR;
+ /*[ end_label ]*/
+$$
+DELIMITER ;
+
+INSERT IGNORE INTO  `demay_farm`.`dining_temp` (SELECT RecTime AS t, json_value(message, '$.dining_temp') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Temps/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`living_temp` (SELECT RecTime AS t, json_value(message, '$.living_temp') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Temps/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`guest_temp` (SELECT RecTime AS t, json_value(message, '$.guest_temp') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Temps/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`kitchen_temp` (SELECT RecTime AS t, json_value(message, '$.kitchen_temp') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Temps/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`computer_temp` (SELECT RecTime AS t, json_value(message, '$.computer_temp') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Temps/data' AND RecTime > '2023-04-07 10:50:53');
+
+
+
+INSERT IGNORE INTO  `demay_farm`.`dining_hum` (SELECT RecTime AS t, json_value(message, '$.dining_hum') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Hums/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`living_hum` (SELECT RecTime AS t, json_value(message, '$.living_hum') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Hums/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`guest_hum` (SELECT RecTime AS t, json_value(message, '$.guest_hum') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Hums/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`kitchen_hum` (SELECT RecTime AS t, json_value(message, '$.kitchen_hum') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Hums/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`computer_hum` (SELECT RecTime AS t, json_value(message, '$.computer_hum') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Hums/data' AND RecTime > '2023-04-07 10:50:53');
+
+
+INSERT IGNORE INTO  `demay_farm`.`fridge_power` (SELECT RecTime AS t, json_value(message, '$.fridge_power') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Powers/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`humidifier_power` (SELECT RecTime AS t, json_value(message, '$.humidifier_power') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Powers/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`master_heater_power` (SELECT RecTime AS t, json_value(message, '$.master_heater_power') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Powers/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`kitchen_heater_power` (SELECT RecTime AS t, json_value(message, '$.kitchen_heater_power') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Powers/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`living_heater_power` (SELECT RecTime AS t, json_value(message, '$.living_heater_power') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Powers/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`dining_heater_power` (SELECT RecTime AS t, json_value(message, '$.dining_heater_power') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Powers/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`guest_heater_power` (SELECT RecTime AS t, json_value(message, '$.guest_heater_power') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Powers/data' AND RecTime > '2023-04-07 10:50:53');
+
+INSERT IGNORE INTO  `demay_farm`.`computer_heater_power` (SELECT RecTime AS t, json_value(message, '$.computer_heater_power') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Powers/data' AND RecTime > '2023-04-07 10:50:53');
 
 
 -- INSERT IGNORE INTO `demay_farm`.`computer_motion` (Time, Sensor, value)
@@ -197,6 +263,55 @@ BEGIN
         CALL  add_pt_to_gate_open(NEW.rectime, json_value(NEW.message, '$.GateOpen') = 'ON');
         INSERT IGNORE INTO `demay_farm`.`gate_angle` SET time = NEW.RecTime, value = json_value(NEW.message, '$.GateAngle');
         INSERT IGNORE INTO `demay_farm`.`gate_battery` SET time = NEW.RecTime, value = json_value(NEW.message, '$.BatteryVolts');
+        LEAVE `whole_proc`;
+    END IF;
+    /* HomeAssistant states message example
+    haState/Temps/data { "utcTime": "2023-04-19 14:55:00.240945" , "dining_temp": 60.9 ,"living_temp": 63.2 ,"guest_temp": 61.6  ,"kitchen_temp": 62.7 ,"computer_temp": 66.02 }
+    */
+    IF NEW.topic = 'haState/Temps/data' THEN
+        -- CALL  add_pt_to_master_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
+        INSERT IGNORE INTO `demay_farm`.`dining_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.dining_temp');
+        INSERT IGNORE INTO `demay_farm`.`living_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.living_temp');
+        INSERT IGNORE INTO `demay_farm`.`guest_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.guest_temp');
+        INSERT IGNORE INTO `demay_farm`.`kitchen_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.kitchen_temp');
+        INSERT IGNORE INTO `demay_farm`.`computer_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.computer_temp');
+        LEAVE `whole_proc`;
+    END IF;
+    /* HomeAssistant states message example
+    haState/Hums/data { "utcTime": "2023-04-19 14:55:00.257226" , "dining_hum": 21.0 ,"living_hum": 34.0 ,"guest_hum": 28.0 ,"kitchen_hum": 34.0 ,"computer_hum": 33 }
+    */
+    IF NEW.topic = 'haState/Hums/data' THEN
+        -- CALL  add_pt_to_master_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
+        INSERT IGNORE INTO `demay_farm`.`dining_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.dining_hum');
+        INSERT IGNORE INTO `demay_farm`.`living_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.living_hum');
+        INSERT IGNORE INTO `demay_farm`.`guest_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.guest_hum');
+        INSERT IGNORE INTO `demay_farm`.`kitchen_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.kitchen_hum');
+        INSERT IGNORE INTO `demay_farm`.`computer_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.computer_hum');
+        LEAVE `whole_proc`;
+    END IF;
+    /* HomeAssistant states message example
+    haState/Powers/data { "utcTime": "2023-04-19 14:55:00.271107" , "fridge_power": 89.98 ,"humidifier_power": 0.0 ,"master_heater_power": 0.0 ,"kitchen_heater_power": 0.0 ,"living_heater_power": 0.0 ,"dining_heater_power": 0.0 ,"guest_heater_power": 0.0  ,"kitchen_heater_power": 0.0 ,"computer_heater_power": 0.0 }
+    */
+    IF NEW.topic = 'haState/Powers/data' THEN
+        -- CALL  add_pt_to_master_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
+        INSERT IGNORE INTO `demay_farm`.`fridge_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.fridge_power');
+        INSERT IGNORE INTO `demay_farm`.`humidifier_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.humidifier_power');
+        INSERT IGNORE INTO `demay_farm`.`master_heater_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.master_heater_power');
+        INSERT IGNORE INTO `demay_farm`.`kitchen_heater_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.kitchen_heater_power');
+        INSERT IGNORE INTO `demay_farm`.`living_heater_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.living_heater_power');
+        INSERT IGNORE INTO `demay_farm`.`dining_heater_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.dining_heater_power');
+        INSERT IGNORE INTO `demay_farm`.`guest_heater_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.guest_heater_power');
+        INSERT IGNORE INTO `demay_farm`.`computer_heater_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.computer_heater_power');
+        LEAVE `whole_proc`;
+    END IF;
+    /* HomeAssistant states message example
+    haState/Motions/data { "utcTime": "2023-04-19 14:55:00.285041" , "dining_motion": 0 ,"living_motion": 0 ,"guest_motion": 0 ,"kitchen_motion": 0 ,"computer_motion": 0 }
+    */
+    IF NEW.topic = 'haState/Motions/data' THEN
+        CALL  add_pt_to_dining_motion(NEW.rectime, json_value(NEW.message, '$.dining_motion'));
+        CALL  add_pt_to_living_motion(NEW.rectime, json_value(NEW.message, '$.living_motion'));
+        CALL  add_pt_to_guest_motion(NEW.rectime, json_value(NEW.message, '$.guest_motion'));
+        CALL  add_pt_to_kitchen_motion(NEW.rectime, json_value(NEW.message, '$.kitchen_motion'));
         LEAVE `whole_proc`;
     END IF;
 END;

@@ -258,13 +258,14 @@ color_map = "Greens"
 color = "green"
 location = "right"
 [[RCGate.items]]
-query = "SELECT Time AS 'Time', value AS 'Angle' FROM `{my_schema}`.`gate_angle` WHERE Time > '{BeginDate}' ORDER BY Time"
+# Filter out spurious angles.
+query = "SELECT Time AS 'Time', IF(ABS(value - ((LAG(value,1) OVER (ORDER BY Time)) + (LAG(value, 2) OVER (ORDER BY Time)) + (LEAD(value, 1) OVER (ORDER BY Time)) + (LEAD(value, 2) OVER (ORDER BY Time)))/4) < 15, value, NULL) AS 'Angle' FROM `{my_schema}`.`gate_angle` WHERE Time > '{BeginDate}' ORDER BY Time"
 variableNames = [ "Angle",]
 datafile = "RcGateAngle.csv"
 axisNum = 0
 dataname = "GATE ANGLE"
 [[RCGate.items]]
-query = "SELECT Time AS 'Time', value AS 'Battery' FROM `{my_schema}`.`gate_battery` WHERE Time > '{BeginDate}' ORDER BY Time"
+query = "SELECT Time AS 'Time', AVG(value) OVER (ORDER BY Time ROWS BETWEEN 40 PRECEDING AND 40 FOLLOWING) AS 'Battery' FROM `{my_schema}`.`gate_battery` WHERE Time > '{BeginDate}' ORDER BY Time"
 variableNames = [ "Battery",]
 datafile = "RcGateBattery.csv"
 axisNum = 2

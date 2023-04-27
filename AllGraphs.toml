@@ -367,6 +367,11 @@ XaxisTitle = "Date/Time"
 [[RCSolar.Yaxes]]
 title = "Watts"
 [[RCSolar.Yaxes]]
+title = "24Hr K Watts"
+color_map = "Blues"
+color = "blue"
+location = "left"
+[[RCSolar.Yaxes]]
 title = "W/m^2"
 color_map = "Reds"
 color = "red"
@@ -378,10 +383,16 @@ datafile = "RCSolar.csv"
 axisNum = 0
 dataname = "RIDGECREST SOLAR"
 [[RCSolar.items]]
+query = "SELECT Time AS 'Time', 24HrWh/1000.0 AS '24Hr K Watts' FROM `{my_schema}`.`solar24Hr` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Watts24Hr",]
+datafile = "RC24HrSolar.csv"
+axisNum = 1
+dataname = "RIDGECREST 24Hr SOLAR"
+[[RCSolar.items]]
 query = "SELECT date AS 'Time', solarradiation as SolarRad FROM `{my_schema}`.`rcweather` WHERE date > '{BeginDate}' ORDER BY date"
 variableNames = [ "SolarRad",]
 datafile = "SolarRad.csv"
-axisNum = 1
+axisNum = 2
 dataname = "SOLAR RADIATION"
 
 [RCWater]

@@ -77,6 +77,16 @@ $$
 DELIMITER ;
 
 DELIMITER $$
+FOR rec IN ( SELECT Time AS t, wh AS wh FROM `demay_farm`.`solarinverter_102` WHERE Time > '2022-04-03' )
+DO 
+  SELECT Time, wh INTO @prevTime, @prevWh FROM `demay_farm`.`solarinverter_102` WHERE Time > TIMESTAMPADD(MINUTE, -1443, rec.t) LIMIT 1;
+  INSERT IGNORE INTO  `demay_farm`.`solar24Hr` SET Time = rec.t, 24HrWh = rec.wh - @prevWh;
+END FOR;
+$$
+DELIMITER ;
+
+
+-- DELIMITER $$
 /*[begin_label:]*/
 -- FOR rec IN ( SELECT RecTime AS t, message AS m FROM `demay_farm`.`mqttmessages` WHERE topic = 'cc50e3550d5b/data' AND RecTime > timestampadd(day, -90, now()) )
 -- DO INSERT IGNORE INTO `demay_farm`.`master_temp` SET time = rec.t, value = json_value(rec.m, '$.Temperature');
@@ -204,10 +214,29 @@ INSERT IGNORE INTO  `demay_farm`.`guest_heater_power` (SELECT RecTime AS t, json
 INSERT IGNORE INTO  `demay_farm`.`computer_heater_power` (SELECT RecTime AS t, json_value(message, '$.computer_heater_power') AS v FROM `demay_farm`.`mqttmessages` WHERE topic = 'haState/Powers/data' AND RecTime > '2023-04-07 10:50:53');
 
 
+/*
+ *  Trigger on solarinverter data to save interesting values to individual tables.
+ *  For easier access for plotting.
+*/
+DELIMITER $$
+CREATE OR REPLACE TRIGGER Update24HrWh AFTER INSERT ON `demay_farm`.`solarinverter_102`
+FOR EACH ROW
+BEGIN
+    /* Pressure Booster pump data.  */
+  SELECT Time, wh INTO @prevTime, @prevWh FROM `demay_farm`.`solarinverter_102` WHERE Time > TIMESTAMPADD(MINUTE, -1443, NEW.Time) LIMIT 1;
+  INSERT IGNORE INTO  `demay_farm`.`solar24Hr` SET Time = NEW.Time, 24HrWh = NEW.wh - @prevWh;
+END;
+$$
+DELIMITER ;
+
 -- INSERT IGNORE INTO `demay_farm`.`computer_motion` (Time, Sensor, value)
 --   SELECT RecTime, "Computer Room", json_value(message, '$.MotionDetected') = 'ON' FROM `demay_far,`.`mqttmessages`
 --   WHERE topic = 'a020a613638e/data' AND SUBSTR(json_value(message, '$.PublishReason'),1,1) = 'M' ;
 
+/*
+ *  Trigger on mqttmessages to save interesting values to individual tables.
+ *  For easier access for plotting.
+*/
 DELIMITER $$
 CREATE OR REPLACE TRIGGER SaveInterestingMqtt AFTER INSERT ON `demay_farm`.`mqttmessages`
 FOR EACH ROW
@@ -328,26 +357,26 @@ AFTER INSERT ON `new_ha`.`states`
 FOR EACH ROW
 `whole_proc`:
 BEGIN
- IF NEW.entity_id='sensor.dining_enviro_air_temperature' AND NEW.state < 140 AND NEW.state > 20 THEN
-  INSERT IGNORE INTO `demay_farm`.`dining_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
-  LEAVE `whole_proc`;
- END IF;
- IF NEW.entity_id='sensor.guest_bed_enviro_air_temperature' AND NEW.state < 140 AND NEW.state > 20 THEN
-  INSERT IGNORE INTO `demay_farm`.`guest_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
-  LEAVE `whole_proc`;
- END IF;
- IF NEW.entity_id='sensor.kitchen_enviro_air_temperature_3' AND NEW.state < 140 AND NEW.state > 20 THEN
-  INSERT IGNORE INTO `demay_farm`.`kitchen_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
-  LEAVE `whole_proc`;
- END IF;
+--  IF NEW.entity_id='sensor.dining_enviro_air_temperature' AND NEW.state < 140 AND NEW.state > 20 THEN
+--   INSERT IGNORE INTO `demay_farm`.`dining_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
+--   LEAVE `whole_proc`;
+--  END IF;
+--  IF NEW.entity_id='sensor.guest_bed_enviro_air_temperature' AND NEW.state < 140 AND NEW.state > 20 THEN
+--   INSERT IGNORE INTO `demay_farm`.`guest_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
+--   LEAVE `whole_proc`;
+--  END IF;
+--  IF NEW.entity_id='sensor.kitchen_enviro_air_temperature_3' AND NEW.state < 140 AND NEW.state > 20 THEN
+--   INSERT IGNORE INTO `demay_farm`.`kitchen_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
+--   LEAVE `whole_proc`;
+--  END IF;
  IF NEW.entity_id='sensor.master_bedroom_temperature' AND NEW.state < 140 AND NEW.state > 20 THEN
   INSERT IGNORE INTO `demay_farm`.`master_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
- IF NEW.entity_id='sensor.living_room_enviro_air_temperature_2' AND NEW.state < 140 AND NEW.state > 20 THEN
-  INSERT IGNORE INTO `demay_farm`.`living_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
-  LEAVE `whole_proc`;
- END IF;
+--  IF NEW.entity_id='sensor.living_room_enviro_air_temperature_2' AND NEW.state < 140 AND NEW.state > 20 THEN
+--   INSERT IGNORE INTO `demay_farm`.`living_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
+--   LEAVE `whole_proc`;
+--  END IF;
 
  IF NEW.entity_id='sensor.thermostat_temperature' AND NEW.state NOT LIKE 'unknown' AND NEW.state > 0 THEN
   INSERT IGNORE INTO `demay_farm`.`thermostat_temp` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=round(NEW.state);
@@ -359,31 +388,31 @@ BEGIN
   LEAVE `whole_proc`;
  END IF;
 
- IF NEW.state NOT LIKE 'unknown' AND NEW.entity_id='climate.thermostat' THEN
-  INSERT IGNORE INTO `demay_farm`.`ac_power` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=if(json_value(NEW.attributes,'$.hvac_action')='idle',0.0, if(json_value(NEW.attributes,'$.equipment_running')='compCool1,fan',2100.0, 0.0));
-  LEAVE `whole_proc`;
- END IF;
+--  IF NEW.state NOT LIKE 'unknown' AND NEW.entity_id='climate.thermostat' THEN
+--   INSERT IGNORE INTO `demay_farm`.`ac_power` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_updated), value=if(json_value(NEW.attributes,'$.hvac_action')='idle',0.0, if(json_value(NEW.attributes,'$.equipment_running')='compCool1,fan',2100.0, 0.0));
+--   LEAVE `whole_proc`;
+--  END IF;
 
- IF NEW.entity_id='sensor.dining_enviro_humidity' AND NEW.state < 110 AND NEW.state > -10 THEN
-  INSERT IGNORE INTO `demay_farm`.`dining_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
-  LEAVE `whole_proc`;
- END IF;
- IF NEW.entity_id='sensor.guest_bed_enviro_humidity' AND NEW.state < 110 AND NEW.state > -10 THEN
-  INSERT IGNORE INTO `demay_farm`.`guest_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
-  LEAVE `whole_proc`;
- END IF;
- IF NEW.entity_id='sensor.kitchen_enviro_humidity_3' AND NEW.state < 110 AND NEW.state > -10 THEN
-  INSERT IGNORE INTO `demay_farm`.`kitchen_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
-  LEAVE `whole_proc`;
- END IF;
+--  IF NEW.entity_id='sensor.dining_enviro_humidity' AND NEW.state < 110 AND NEW.state > -10 THEN
+--   INSERT IGNORE INTO `demay_farm`.`dining_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
+--   LEAVE `whole_proc`;
+--  END IF;
+--  IF NEW.entity_id='sensor.guest_bed_enviro_humidity' AND NEW.state < 110 AND NEW.state > -10 THEN
+--   INSERT IGNORE INTO `demay_farm`.`guest_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
+--   LEAVE `whole_proc`;
+--  END IF;
+--  IF NEW.entity_id='sensor.kitchen_enviro_humidity_3' AND NEW.state < 110 AND NEW.state > -10 THEN
+--   INSERT IGNORE INTO `demay_farm`.`kitchen_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
+--   LEAVE `whole_proc`;
+--  END IF;
  IF NEW.entity_id='sensor.master_bedroom_humidity' AND NEW.state < 110 AND NEW.state > -10 THEN
   INSERT IGNORE INTO `demay_farm`.`master_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
   LEAVE `whole_proc`;
  END IF;
- IF NEW.entity_id='sensor.living_room_enviro_humidity_2' AND NEW.state < 110 AND NEW.state > -10 THEN
-  INSERT IGNORE INTO `demay_farm`.`living_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
-  LEAVE `whole_proc`;
- END IF;
+--  IF NEW.entity_id='sensor.living_room_enviro_humidity_2' AND NEW.state < 110 AND NEW.state > -10 THEN
+--   INSERT IGNORE INTO `demay_farm`.`living_hum` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);
+--   LEAVE `whole_proc`;
+--  END IF;
 
  IF NEW.entity_id='sensor.computer_room_heater_switch_power' AND NEW.state < 5000 THEN
   INSERT IGNORE INTO `demay_farm`.`computer_heater_power` SET time=TIMESTAMPADD(SECOND, TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()), NEW.last_changed), value=round(NEW.state, 1);

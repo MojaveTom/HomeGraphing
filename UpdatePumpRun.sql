@@ -12,3 +12,19 @@ FOR rec IN (SELECT rectime, (json_value(message, '$.PumpRun') = 'ON') AS val FRO
     END FOR;
 |
 delimiter ;
+
+select RecTime,
+ json_value(message, '$.GateAngle') as 'Raw Angle',
+ IF(
+    ABS(
+        json_value(message, '$.GateAngle')
+         - 
+        (
+              (LAG(json_value(message, '$.GateAngle'),1) OVER (ORDER BY RecTime))
+            + (LAG(json_value(message, '$.GateAngle'),2) OVER (ORDER BY RecTime))
+            + (LEAD(json_value(message, '$.GateAngle'),1) OVER (ORDER BY RecTime))
+            + (LEAD(json_value(message, '$.GateAngle'),2) OVER (ORDER BY RecTime))
+            )/4) < 10, json_value(message, '$.GateAngle'), NULL) as 'Angle'
+from testmqttmessages 
+where topic like 'e8db84e569cf/data' AND RecTime > TIMESTAMPADD(hour, -4, NOW())
+ORDER BY RecTime;

@@ -13,7 +13,38 @@ CREATE TABLE IF NOT EXISTS `steamboat`.`args`
     prevValm1 boolean
 );
 |
+/*    Stuff for 24Hr solar production table
+CREATE TABLE `solar24Hr` (
+  `Time` timestamp NOT NULL,
+  `24HrWh` double DEFAULT NULL,
+  PRIMARY KEY (`Time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+/*
+ *  Trigger on solarinverter data to save interesting values to individual tables.
+ *  For easier access for plotting.
+ */                             
+DELIMITER $$
+CREATE OR REPLACE TRIGGER Update24HrWh AFTER INSERT ON `Steamboat`.`solarinverter_102`
+FOR EACH ROW
+BEGIN
+  SELECT Time, wh INTO @prevTime, @prevWh FROM `Steamboat`.`solarinverter_102` WHERE Time > TIMESTAMPADD(MINUTE, -1443, NEW.Time) LIMIT 1;
+  INSERT IGNORE INTO  `Steamboat`.`solar24Hr` SET Time = NEW.Time, 24HrWh = NEW.wh - @prevWh;
+END;
+$$
+DELIMITER ;
 
+/* Fill in solar24Hr table from history
+ *//
+DELIMITER $$
+FOR rec IN ( SELECT Time AS t, wh AS wh FROM `Steamboat`.`solarinverter_102` WHERE Time > '2022-04-03' )
+DO 
+  SELECT Time, wh INTO @prevTime, @prevWh FROM `Steamboat`.`solarinverter_102` WHERE Time > TIMESTAMPADD(MINUTE, -1443, rec.t) LIMIT 1;
+  INSERT IGNORE INTO  `Steamboat`.`solar24Hr` SET Time = rec.t, 24HrWh = rec.wh - @prevWh;
+END FOR;
+$$
+DELIMITER ;
+
+---------------------------------------
 CREATE OR REPLACE PROCEDURE ShowArgs(newT DATETIME(6), newV BOOL)
 BEGIN
     INSERT INTO args VALUES (DEFAULT, @theId, @iD, newT, newV, @prevT, @prevVal, @iDm1, @prevTm1, @prevValm1);

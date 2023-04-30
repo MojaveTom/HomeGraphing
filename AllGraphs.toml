@@ -708,6 +708,11 @@ XaxisTitle = "Date/Time"
 [[SSSolar.Yaxes]]
 title = "Watts"
 [[SSSolar.Yaxes]]
+title = "24Hr K Watts"
+color_map = "Blues"
+color = "blue"
+location = "left"
+[[SSSolar.Yaxes]]
 title = "W/m^2"
 color_map = "Reds"
 color = "red"
@@ -726,10 +731,16 @@ axisNum = 0
 dataname = "STEAMBOAT SOLAR Battery Charge State"
 
 [[SSSolar.items]]
+query = "SELECT Time AS 'Time', 24HrWh/1000.0 AS '24Hr K Watts' FROM `{my_schema}`.`solar24Hr` WHERE Time > '{BeginDate}' ORDER BY Time"
+variableNames = [ "Watts24Hr",]
+datafile = "SS24HrSolar.csv"
+axisNum = 1
+dataname = "STEAMBOAT 24Hr SOLAR"
+[[SSSolar.items]]
 query = "SELECT date AS 'Time', solarradiation AS 'Outside' FROM `{my_schema}`.`weather` WHERE date > '{BeginDate}' ORDER BY date"
 variableNames = [ "Outside",]
 datafile = "SSWeatherLight.csv"
-axisNum = 1
+axisNum = 2
 dataname = "SS OUTSIDE LIGHT"
 
 # [[SSSolar.items]]

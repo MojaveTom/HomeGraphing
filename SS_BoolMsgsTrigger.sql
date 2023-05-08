@@ -22,7 +22,7 @@ CREATE TABLE `solar24Hr` (
 /*
  *  Trigger on solarinverter data to save interesting values to individual tables.
  *  For easier access for plotting.
- */                             
+ */
 DELIMITER $$
 CREATE OR REPLACE TRIGGER Update24HrWh AFTER INSERT ON `Steamboat`.`solarinverter_102`
 FOR EACH ROW
@@ -37,7 +37,7 @@ DELIMITER ;
  *//
 DELIMITER $$
 FOR rec IN ( SELECT Time AS t, wh AS wh FROM `Steamboat`.`solarinverter_102` WHERE Time > '2022-04-03' )
-DO 
+DO
   SELECT Time, wh INTO @prevTime, @prevWh FROM `Steamboat`.`solarinverter_102` WHERE Time > TIMESTAMPADD(MINUTE, -1443, rec.t) LIMIT 1;
   INSERT IGNORE INTO  `Steamboat`.`solar24Hr` SET Time = rec.t, 24HrWh = rec.wh - @prevWh;
 END FOR;
@@ -164,6 +164,13 @@ END FOR;
 $$
 DELIMITER ;
 
+CREATE OR REPLACE FUNCTION IsNumeric (sIn varchar(1024)) RETURNS tinyint
+RETURN sIn REGEXP '^(-|\\+){0,1}([0-9]+\\.[0-9]*|[0-9]*\\.[0-9]+|[0-9]+)$';
+
+CREATE OR REPLACE FUNCTION FloatVal (sIn varchar(1024)) RETURNS FLOAT
+RETURN IF(IsNumeric(sIn), CAST(sIn AS FLOAT), NULL);
+
+
 /**************  Create when `steamboat` is the active database.  ***************************/
 DELIMITER $$
 CREATE OR REPLACE TRIGGER SaveInterestingMqtt AFTER INSERT ON `steamboat`.`mqttmessages`
@@ -222,6 +229,71 @@ BEGIN
         INSERT IGNORE INTO `steamboat`.`craft_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.Temperature');
         INSERT IGNORE INTO `steamboat`.`craft_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.Humidity');
         INSERT IGNORE INTO `steamboat`.`craft_light` SET time = NEW.rectime, value = json_value(NEW.message, '$.LightValue');
+        LEAVE `whole_proc`;
+    END IF;
+    /* HomeAssistant states message example
+    haState/Temps/data { "utcTime": "2023-04-19 14:55:00.240945" , "dining_temp": 60.9 ,"living_temp": 63.2 ,"guest_temp": 61.6  ,"kitchen_temp": 62.7 ,"computer_temp": 66.02 }
+    */
+    IF NEW.topic = 'haState/Temps/data' THEN
+        INSERT IGNORE INTO `steamboat`.`living_temp` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.living_temp'));
+        INSERT IGNORE INTO `steamboat`.`mud_temp` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.mud_temp'));
+        INSERT IGNORE INTO `steamboat`.`master_temp` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.master_temp'));
+        INSERT IGNORE INTO `steamboat`.`computer_temp` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.computer_temp'));
+        LEAVE `whole_proc`;
+    END IF;
+    /* HomeAssistant states message example
+    haState/Hums/data { "utcTime": "2023-04-19 14:55:00.257226" , "dining_hum": 21.0 ,"living_hum": 34.0 ,"guest_hum": 28.0 ,"kitchen_hum": 34.0 ,"computer_hum": 33 }
+    */
+    IF NEW.topic = 'haState/Hums/data' THEN
+        INSERT IGNORE INTO `steamboat`.`living_hum` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.living_hum'));
+        INSERT IGNORE INTO `steamboat`.`master_hum` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.master_hum'));
+        INSERT IGNORE INTO `steamboat`.`mud_hum` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.mud_hum'));
+        INSERT IGNORE INTO `steamboat`.`computer_hum` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.computer_hum'));
+        LEAVE `whole_proc`;
+    END IF;
+    /* HomeAssistant states message example
+    haState/Powers/data { "utcTime": "2023-04-19 14:55:00.271107" , "fridge_power": 89.98 ,"humidifier_power": 0.0 ,"master_heater_power": 0.0 ,"kitchen_heater_power": 0.0 ,"living_heater_power": 0.0 ,"dining_heater_power": 0.0 ,"guest_heater_power": 0.0  ,"kitchen_heater_power": 0.0 ,"computer_heater_power": 0.0 }
+    */
+    IF NEW.topic = 'haState/Powers/data' THEN
+        INSERT IGNORE INTO `steamboat`.`master_heater_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.master_heater_power'));
+        INSERT IGNORE INTO `steamboat`.`kitchen_heater_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.kitchen_heater_power'));
+        INSERT IGNORE INTO `steamboat`.`living_heater_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.living_heater_power'));
+        INSERT IGNORE INTO `steamboat`.`craft_heater_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.craft_heater_power'));
+        INSERT IGNORE INTO `steamboat`.`guest_heater_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.guest_heater_power'));
+        INSERT IGNORE INTO `steamboat`.`computer_heater_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.computer_heater_power'));
+        LEAVE `whole_proc`;
+    END IF;
+
+/*
+haState/Lights/data { "utcTime": "2023-05-08 18:10:00.126951" , "living_light": "63.0" , "mud_light": "0.0" , "master_light": "115.0" , "computer_light": "298.0" }
+*/
+    IF NEW.topic = 'haState/Lights/data' THEN
+        INSERT IGNORE INTO `steamboat`.`master_light` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.master_light'));
+        INSERT IGNORE INTO `steamboat`.`living_light` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.living_light'));
+        INSERT IGNORE INTO `steamboat`.`mud_light` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.mud_light'));
+        INSERT IGNORE INTO `steamboat`.`computer_light` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.computer_light'));
+        LEAVE `whole_proc`;
+    END IF;
+
+/*
+haState/Uvs/data { "utcTime": "2023-05-08 18:10:00.135332" , "living_uv": "0.0" , "mud_uv": "0.0" , "master_uv": "0.0" , "computer_uv": "0.0" }
+*/
+    IF NEW.topic = 'haState/Uvs/data' THEN
+        INSERT IGNORE INTO `steamboat`.`master_uv` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.master_uv'));
+        INSERT IGNORE INTO `steamboat`.`living_uv` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.living_uv'));
+        INSERT IGNORE INTO `steamboat`.`mud_uv` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.mud_uv'));
+        INSERT IGNORE INTO `steamboat`.`computer_uv` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.computer_uv'));
+        LEAVE `whole_proc`;
+    END IF;
+
+    /* HomeAssistant states message example
+    haState/Motions/data { "utcTime": "2023-04-19 14:55:00.285041" , "dining_motion": 0 ,"living_motion": 0 ,"guest_motion": 0 ,"kitchen_motion": 0 ,"computer_motion": 0 }
+    */
+    IF NEW.topic = 'haState/Motions/data' THEN
+        CALL  add_pt_to_master_motion(NEW.rectime, json_value(NEW.message, '$.master_motion'));
+        CALL  add_pt_to_living_motion(NEW.rectime, json_value(NEW.message, '$.living_motion'));
+        CALL  add_pt_to_computer_motion(NEW.rectime, json_value(NEW.message, '$.computer_motion'));
+        CALL  add_pt_to_mud_motion(NEW.rectime, json_value(NEW.message, '$.mud_motion'));
         LEAVE `whole_proc`;
     END IF;
 END;

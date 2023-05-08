@@ -78,7 +78,7 @@ DELIMITER ;
 
 DELIMITER $$
 FOR rec IN ( SELECT Time AS t, wh AS wh FROM `demay_farm`.`solarinverter_102` WHERE Time > '2022-04-03' )
-DO 
+DO
   SELECT Time, wh INTO @prevTime, @prevWh FROM `demay_farm`.`solarinverter_102` WHERE Time > TIMESTAMPADD(MINUTE, -1443, rec.t) LIMIT 1;
   INSERT IGNORE INTO  `demay_farm`.`solar24Hr` SET Time = rec.t, 24HrWh = rec.wh - @prevWh;
 END FOR;
@@ -233,6 +233,12 @@ DELIMITER ;
 --   SELECT RecTime, "Computer Room", json_value(message, '$.MotionDetected') = 'ON' FROM `demay_far,`.`mqttmessages`
 --   WHERE topic = 'a020a613638e/data' AND SUBSTR(json_value(message, '$.PublishReason'),1,1) = 'M' ;
 
+CREATE OR REPLACE FUNCTION IsNumeric (sIn varchar(1024)) RETURNS tinyint
+RETURN sIn REGEXP '^(-|\\+){0,1}([0-9]+\\.[0-9]*|[0-9]*\\.[0-9]+|[0-9]+)$';
+
+CREATE OR REPLACE FUNCTION FloatVal (sIn varchar(1024)) RETURNS FLOAT
+RETURN IF(IsNumeric(sIn), CAST(sIn AS FLOAT), NULL);
+
 /*
  *  Trigger on mqttmessages to save interesting values to individual tables.
  *  For easier access for plotting.
@@ -294,43 +300,41 @@ BEGIN
         INSERT IGNORE INTO `demay_farm`.`gate_battery` SET time = NEW.RecTime, value = json_value(NEW.message, '$.BatteryVolts');
         LEAVE `whole_proc`;
     END IF;
+
     /* HomeAssistant states message example
     haState/Temps/data { "utcTime": "2023-04-19 14:55:00.240945" , "dining_temp": 60.9 ,"living_temp": 63.2 ,"guest_temp": 61.6  ,"kitchen_temp": 62.7 ,"computer_temp": 66.02 }
     */
     IF NEW.topic = 'haState/Temps/data' THEN
-        -- CALL  add_pt_to_master_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
-        INSERT IGNORE INTO `demay_farm`.`dining_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.dining_temp');
-        INSERT IGNORE INTO `demay_farm`.`living_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.living_temp');
-        INSERT IGNORE INTO `demay_farm`.`guest_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.guest_temp');
-        INSERT IGNORE INTO `demay_farm`.`kitchen_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.kitchen_temp');
-        INSERT IGNORE INTO `demay_farm`.`computer_temp` SET time = NEW.rectime, value = json_value(NEW.message, '$.computer_temp');
+        INSERT IGNORE INTO `demay_farm`.`dining_temp` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.dining_temp')) ;
+        INSERT IGNORE INTO `demay_farm`.`living_temp` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.living_temp'));
+        INSERT IGNORE INTO `demay_farm`.`guest_temp` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.guest_temp'));
+        INSERT IGNORE INTO `demay_farm`.`kitchen_temp` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.kitchen_temp'));
+        INSERT IGNORE INTO `demay_farm`.`computer_temp` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.computer_temp'));
         LEAVE `whole_proc`;
     END IF;
     /* HomeAssistant states message example
     haState/Hums/data { "utcTime": "2023-04-19 14:55:00.257226" , "dining_hum": 21.0 ,"living_hum": 34.0 ,"guest_hum": 28.0 ,"kitchen_hum": 34.0 ,"computer_hum": 33 }
     */
     IF NEW.topic = 'haState/Hums/data' THEN
-        -- CALL  add_pt_to_master_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
-        INSERT IGNORE INTO `demay_farm`.`dining_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.dining_hum');
-        INSERT IGNORE INTO `demay_farm`.`living_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.living_hum');
-        INSERT IGNORE INTO `demay_farm`.`guest_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.guest_hum');
-        INSERT IGNORE INTO `demay_farm`.`kitchen_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.kitchen_hum');
-        INSERT IGNORE INTO `demay_farm`.`computer_hum` SET time = NEW.rectime, value = json_value(NEW.message, '$.computer_hum');
+        INSERT IGNORE INTO `demay_farm`.`dining_hum` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.dining_hum'));
+        INSERT IGNORE INTO `demay_farm`.`living_hum` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.living_hum'));
+        INSERT IGNORE INTO `demay_farm`.`guest_hum` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.guest_hum'));
+        INSERT IGNORE INTO `demay_farm`.`kitchen_hum` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.kitchen_hum'));
+        INSERT IGNORE INTO `demay_farm`.`computer_hum` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.computer_hum'));
         LEAVE `whole_proc`;
     END IF;
     /* HomeAssistant states message example
     haState/Powers/data { "utcTime": "2023-04-19 14:55:00.271107" , "fridge_power": 89.98 ,"humidifier_power": 0.0 ,"master_heater_power": 0.0 ,"kitchen_heater_power": 0.0 ,"living_heater_power": 0.0 ,"dining_heater_power": 0.0 ,"guest_heater_power": 0.0  ,"kitchen_heater_power": 0.0 ,"computer_heater_power": 0.0 }
     */
     IF NEW.topic = 'haState/Powers/data' THEN
-        -- CALL  add_pt_to_master_motion(NEW.rectime, json_value(NEW.message, '$.MotionDetected') = 'ON');
-        INSERT IGNORE INTO `demay_farm`.`fridge_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.fridge_power');
-        INSERT IGNORE INTO `demay_farm`.`humidifier_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.humidifier_power');
-        INSERT IGNORE INTO `demay_farm`.`master_heater_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.master_heater_power');
-        INSERT IGNORE INTO `demay_farm`.`kitchen_heater_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.kitchen_heater_power');
-        INSERT IGNORE INTO `demay_farm`.`living_heater_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.living_heater_power');
-        INSERT IGNORE INTO `demay_farm`.`dining_heater_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.dining_heater_power');
-        INSERT IGNORE INTO `demay_farm`.`guest_heater_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.guest_heater_power');
-        INSERT IGNORE INTO `demay_farm`.`computer_heater_power` SET time = NEW.rectime, value = json_value(NEW.message, '$.computer_heater_power');
+        INSERT IGNORE INTO `demay_farm`.`fridge_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.fridge_power'));
+        INSERT IGNORE INTO `demay_farm`.`humidifier_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.humidifier_power'));
+        INSERT IGNORE INTO `demay_farm`.`master_heater_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.master_heater_power'));
+        INSERT IGNORE INTO `demay_farm`.`kitchen_heater_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.kitchen_heater_power'));
+        INSERT IGNORE INTO `demay_farm`.`living_heater_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.living_heater_power'));
+        INSERT IGNORE INTO `demay_farm`.`dining_heater_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.dining_heater_power'));
+        INSERT IGNORE INTO `demay_farm`.`guest_heater_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.guest_heater_power'));
+        INSERT IGNORE INTO `demay_farm`.`computer_heater_power` SET time = NEW.rectime, value = FloatVal(json_value(NEW.message, '$.computer_heater_power'));
         LEAVE `whole_proc`;
     END IF;
     /* HomeAssistant states message example

@@ -1,0 +1,58 @@
+# #!/bin/env zsh        ## don't know if this is needed or desireable.
+####
+# Shell script to run HomeGraphing program twice since it seems to get confused if only run once.
+#
+# This script usually lives in $HOME/bin so it will be on PATH.
+#
+# Arguments are as for HomeGraphing EXCEPT for some that don't make sense to use twice.
+#
+cd
+echo "generating plots for '$@'"
+date; python3.11 $HOME/VSCodeProjects/HomeGraphing/HomeGraphing.py ${@//--ShowGraph/} >/dev/null
+# remove arguments that are not needed for the second execution.
+ar=""
+for a in "$@"
+do
+    case "${a}" in
+     --DbDelta* ) ar+=' ' ;;
+     --DeleteOldCSVData ) ar+=' ' ;;
+     * ) ar+=${a} ;;
+    esac
+done
+echo "$HOME/VSCodeProjects/HomeGraphing/HomeGraphing.py ${ar}"
+date; python3.11 $HOME/VSCodeProjects/HomeGraphing/HomeGraphing.py ${ar} >/dev/null
+
+# Get a list of desired plot files
+ar=""
+for a in "$@"
+do
+    if [ -z "${a##-*}" ]; then echo "'$a' is an option."
+    else
+        echo "'$a' is not an option"
+        f='GraphingHtml/*'"${a}"'* '
+        eval ls ${f} &>/dev/null
+        s=$?
+        echo "Status of listing graphing file(s) '${f}' is ${s}."
+        if  (( ! ${s} )); then
+            ar+=${f}
+        else
+            echo "Suspected graphing file '${f}' does not exist and will not be shown."
+        fi
+    fi
+done
+if [[ ${@//--ShowGraph/} != ${@} ]]
+then
+    echo "program shows graphs."
+    cd - 2&>/dev/null
+    exit
+else
+    echo "script shows graphs."
+fi
+if [ -z "${ar}" ]; then
+    echo "No command graphs defined; show all graphs."
+    ar='GraphingHtml/*'
+fi
+echo "Showing graphs: ${ar}"
+date
+open -a Safari ${ar}
+cd - 2&>/dev/null
